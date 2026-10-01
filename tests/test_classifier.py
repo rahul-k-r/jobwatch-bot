@@ -113,6 +113,10 @@ async def test_daily_budget_is_enforced(db, cfg):
     # "Technical Sourcer, Research SWE": Gemini saw a recruiting role; that must drop it.
     (item("0", min_years=None, level="unknown", in_scope=False), True),
     ({k: v for k, v in item("0").items() if k != "in_scope"}, False),  # missing -> fail open
+    # "Software Engineer: Intership Opportunities": the title regex misses the typo, Gemini doesn't.
+    (item("0", min_years=None, level="intern"), True),
+    (item("0", min_years=0, level="intern"), True),  # stated years don't rescue an internship
+    (item("0", min_years=None, level="entry"), False),  # new grad stays in
 ])
 def test_exclusion_reason(c, excluded):
     assert (exclusion_reason(c, exclude_min_years=5, require_sponsorship=True) is not None) is excluded
@@ -128,6 +132,19 @@ def test_schema_and_prompt_ask_whether_the_role_is_engineering_at_all():
     from jobwatch.classifier import _PROMPT, _SCHEMA
     assert "in_scope" in _SCHEMA["items"]["required"]
     assert "recruiting" in _PROMPT and "even if the title" in _PROMPT
+
+
+def test_schema_and_prompt_ask_for_role_highlights():
+    from jobwatch.classifier import _PROMPT, _SCHEMA
+    assert _SCHEMA["items"]["properties"]["highlights"]["type"] == "STRING"
+    assert "highlights" in _SCHEMA["items"]["required"]
+    assert "highlights:" in _PROMPT
+
+
+def test_schema_and_prompt_separate_internships_from_new_grad():
+    from jobwatch.classifier import _PROMPT, _SCHEMA
+    assert "intern" in _SCHEMA["items"]["properties"]["level"]["enum"]
+    assert "co-op" in _PROMPT and "new grad" in _PROMPT
 
 
 def test_excerpt_keeps_qualifications_of_long_posting():

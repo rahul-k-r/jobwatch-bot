@@ -33,27 +33,29 @@ _SCHEMA = {
         "type": "OBJECT",
         "properties": {
             "id": {"type": "STRING"},
-            "level": {"type": "STRING", "enum": ["entry", "mid", "senior", "staff_plus", "unknown"]},
+            "level": {"type": "STRING", "enum": ["intern", "entry", "mid", "senior", "staff_plus", "unknown"]},
             "min_years": {"type": "INTEGER", "nullable": True},
             "mentions_repost": {"type": "BOOLEAN"},
             "sponsorship": {"type": "STRING", "enum": ["available", "not_available", "unspecified"]},
             "phd_required": {"type": "BOOLEAN"},
             "in_scope": {"type": "BOOLEAN"},
+            "highlights": {"type": "STRING"},
             "reason": {"type": "STRING"},
         },
         "required": ["id", "level", "min_years", "mentions_repost", "sponsorship", "phd_required", "in_scope",
-                     "reason"],
+                     "highlights", "reason"],
     },
 }
 
 _PROMPT = """You classify job postings for a software engineer with a Master's degree and about 3 years of experience who needs US visa sponsorship.
 For each posting return:
-- level: entry | mid | senior | staff_plus | unknown, judged from the title AND the requirements (internal level codes such as IC3 / L4 / SDE II count).
+- level: intern | entry | mid | senior | staff_plus | unknown, judged from the title AND the requirements (internal level codes such as IC3 / L4 / SDE II count). intern means an internship, co-op or other fixed-term student role, even if the title misspells it; a full-time new grad / university graduate role is entry, not intern.
 - min_years: the minimum years of experience the REQUIRED/basic qualifications ask for (ignore preferred qualifications). Where several degree paths are listed (e.g. "Bachelor's + 4 years OR Master's + 2 years"), use the Master's-degree path. null if not stated.
 - mentions_repost: true only if the text says this is a repost / re-posting or addresses people who previously applied.
 - sponsorship: not_available only if the text says sponsorship is not offered, US citizenship is required, or a security clearance is needed. Generic equal-opportunity language mentioning citizenship or immigration status is NOT a restriction.
 - phd_required: true only if the REQUIRED qualifications demand a PhD and do not accept a Master's degree or equivalent experience instead. "PhD preferred", "PhD or MS", or a PhD listed only under preferred qualifications is false.
 - in_scope: true only if the job itself is hands-on technical work: software / ML / data / infrastructure engineering, forward deployed / solutions / customer / integration engineering, or research engineering / science. false for recruiting or sourcing, sales or account roles, program / product / project management, design, operations, support, data labeling or tutoring, legal, finance and marketing, even if the title mentions engineers or engineering.
+- highlights: one line, at most 18 words, shown in a phone notification: the core stack or skills the REQUIRED qualifications ask for, what the team builds, and anything that changes whether to apply (onsite or hybrid days, travel, on-call, relocation, a degree field). Plain facts from the text, no marketing, no company name, no repeating the title or years.
 - reason: under 15 words.
 Return one object per posting, echoing its id.
 
@@ -175,6 +177,8 @@ def exclusion_reason(c: dict[str, Any], exclude_min_years: int, require_sponsors
         return f"no sponsorship (llm: {c.get('reason')})"
     if c.get("phd_required"):
         return f"PhD required (llm: {c.get('reason')})"
+    if c.get("level") == "intern":
+        return f"internship (llm: {c.get('reason')})"
     years = c.get("min_years")
     # Required years is the objective signal; the level label only decides when years aren't stated.
     if years is not None:

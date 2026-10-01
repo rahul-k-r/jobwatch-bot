@@ -36,18 +36,19 @@ class FakeSource(Source):
 class FakeNotifier:
     def __init__(self):
         self.sent, self.notices, self.fail = [], [], False
-        self.texts = []
+        self.texts, self.attachments = [], []
 
     async def send(self, alerts):
         if self.fail:
             raise RuntimeError("ntfy down")
         self.sent.extend(alerts)
 
-    async def send_text(self, title, message, priority=Priority.DEFAULT, click=None):
+    async def send_text(self, title, message, priority=Priority.DEFAULT, click=None, attachment=None):
         if self.fail:
             raise RuntimeError("ntfy down")
         self.notices.append(title)
         self.texts.append((title, message, priority, click))
+        self.attachments.append(attachment)
 
 
 class FakeClassifier:
@@ -60,8 +61,31 @@ class FakeClassifier:
 
 
 def watcher(db, source, notifier, clock=lambda: NOW, classifier=None, handoff=None, **cfg):
+    cfg.setdefault("startup_spread", 0)
     config = Config(sources=[source], title_rules=RULES, failure_alert_after=2, seed_page_delay=0, **cfg)
     return Watcher(config, db, notifier, classifier=classifier, clock=clock, handoff=handoff)
+
+
+async def test_first_cycle_spreads_polls_so_restarts_dont_burst(db, monkeypatch):
+    import jobwatch.runner as runner
+
+    waits = []
+
+    async def fake_sleep(s):
+        waits.append(s)
+
+    monkeypatch.setattr(runner.asyncio, "sleep", fake_sleep)
+    monkeypatch.setattr(runner.random, "uniform", lambda a, b: (a + b) / 2)
+    a, b = FakeSource([[make_job("1", "Software Engineer")]]), FakeSource([])
+    b.company = "Other"
+    w = watcher(db, a, FakeNotifier(), startup_spread=60)
+    w.cfg.sources.append(b)
+
+    await w.cycle(None)
+    assert sorted(x for x in waits if x) == [30, 30]  # one random start offset per source
+    waits.clear()
+    await w.cycle(None)
+    assert [x for x in waits if x] == []  # later cycles poll straight away
 
 
 async def test_first_poll_seeds_silently_then_alerts_only_new(db):
@@ -199,8 +223,47 @@ async def test_worker_results_do_not_leak_local_paths(db, tmp_path):
     n = FakeNotifier()
     await watcher(db, FakeSource([]), n, handoff=handoff).deliver_handoff_results()
     (_, ready_msg, _, _), (_, fail_msg, _, _) = n.texts
-    assert ready_msg == "acme-fde-1a2b3c4d/cv.pdf"
+    assert ready_msg.startswith("acme-fde-1a2b3c4d/cv.pdf\n") and "someone" not in ready_msg
     assert "someone" not in fail_msg and "Command failed: pdfinfo cv.pdf and cv.tex" == fail_msg
+
+
+async def test_ready_resume_attaches_the_pdf_named_after_the_job(db, tmp_path):
+    import json
+
+    from jobwatch.handoff import Handoff
+
+    job_dir = tmp_path / "out" / "acme-fde-1a2b3c4d"
+    job_dir.mkdir(parents=True)
+    (job_dir / "cv.pdf").write_bytes(b"%PDF-1.5 resume")
+    handoff = Handoff(tmp_path / "handoff")
+    (handoff.outbox / "a.json").write_text(json.dumps({
+        "key": "Acme:1", "company": "Acme", "title": "FDE", "url": "https://x/1", "status": "ready",
+        "pdf": str(job_dir / "cv.pdf")}), encoding="utf-8")
+    n = FakeNotifier()
+    await watcher(db, FakeSource([]), n, handoff=handoff).deliver_handoff_results()
+    assert n.attachments == [("acme-fde-1a2b3c4d.pdf", b"%PDF-1.5 resume")]
+
+
+async def test_only_real_pdfs_are_uploaded(db, tmp_path):
+    import json
+
+    from jobwatch.handoff import Handoff
+
+    # The outbox is another process's output; it must not be able to make jobwatch upload any file.
+    secret = tmp_path / ".env"
+    secret.write_text("GEMINI_API_KEY=x", encoding="utf-8")
+    fake_pdf = tmp_path / "x" / "cv.pdf"
+    fake_pdf.parent.mkdir()
+    fake_pdf.write_text("GEMINI_API_KEY=x", encoding="utf-8")
+    handoff = Handoff(tmp_path / "handoff")
+    for name, path in [("a", secret), ("b", fake_pdf), ("c", tmp_path / "missing" / "cv.pdf")]:
+        (handoff.outbox / f"{name}.json").write_text(json.dumps({
+            "key": f"Acme:{name}", "company": "Acme", "title": "FDE", "url": "https://x/1", "status": "ready",
+            "pdf": str(path)}), encoding="utf-8")
+    n = FakeNotifier()
+    await watcher(db, FakeSource([]), n, handoff=handoff).deliver_handoff_results()
+    assert n.attachments == [None, None, None]
+    assert all("not attached" in msg for _, msg, _, _ in n.texts)
 
 
 async def test_repost_is_alerted_at_low_priority(db):
@@ -316,7 +379,8 @@ async def test_concurrent_polls_are_capped(db):
         s = Slow([])
         s.company = f"C{i}"
         sources.append(s)
-    config = Config(sources=sources, title_rules=RULES, seed_page_delay=0, max_concurrent_sources=2)
+    config = Config(sources=sources, title_rules=RULES, seed_page_delay=0, max_concurrent_sources=2,
+                    startup_spread=0)
     await Watcher(config, db, FakeNotifier(), clock=lambda: NOW).cycle(None)
     assert peak == 2
     assert all(db.is_seeded(f"C{i}") for i in range(6))

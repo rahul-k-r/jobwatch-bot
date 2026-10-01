@@ -7,6 +7,7 @@ import re
 import time
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import httpx
 
@@ -44,11 +45,16 @@ class Watcher:
         self.failures: dict[str, int] = {}
         self.retry_at: dict[str, datetime] = {}
         self.last_poll: dict[str, datetime] = {}
+        self.started = False
 
     async def cycle(self, client: httpx.AsyncClient) -> None:
         limit = asyncio.Semaphore(self.cfg.max_concurrent_sources)
+        spread = 0 if self.started else self.cfg.startup_spread
+        self.started = True
 
         async def poll(source: Source) -> None:
+            if spread:
+                await asyncio.sleep(random.uniform(0, spread))
             async with limit:
                 await self._poll_guarded(client, source)
 
@@ -180,13 +186,16 @@ class Watcher:
             return
         for path, r in self.handoff.collect():
             name = f"{r.get('company')} - {r.get('title')}"
+            attachment = None
             if r.get("status") == "ready":
                 warnings = "".join(f"\n⚠ {w}" for w in r.get("warnings") or [])
-                title, message, priority = f"Resume ready: {name}", f"{_job_pdf(r.get('pdf'))}{warnings}", Priority.HIGH
+                attachment = _read_pdf(r.get("pdf"))
+                note = "" if attachment else "\n(PDF not attached: file missing or not a PDF)"
+                title, message, priority = f"Resume ready: {name}", f"{_job_pdf(r.get('pdf'))}{warnings}{note}", Priority.HIGH
             else:
                 title, message, priority = f"Resume not built: {name}", _strip_paths(str(r.get("reason"))), Priority.DEFAULT
             try:
-                await self.notifier.send_text(title, message, priority, click=r.get("url"))
+                await self.notifier.send_text(title, message, priority, click=r.get("url"), attachment=attachment)
             except Exception as e:
                 log.error("could not send %r, will retry: %r", title, e)
                 continue
@@ -222,6 +231,27 @@ def _job_pdf(pdf: str | None) -> str:
     """'.../output/jobwatch/<job folder>/cv.pdf' -> '<job folder>/cv.pdf'."""
     parts = re.split(r"[\\/]", pdf or "")
     return "/".join(parts[-2:]) if pdf else "PDF path missing"
+
+
+MAX_ATTACHMENT_BYTES = 15 * 1024 * 1024  # ntfy.sh's per-file limit
+
+
+def _read_pdf(pdf: str | None) -> tuple[str, bytes] | None:
+    """(<job folder>.pdf, bytes) for upload, or None. The path comes from another process's output,
+    so anything that isn't a PDF is refused rather than sent to a third-party server."""
+    if not pdf:
+        return None
+    path = Path(pdf)
+    try:
+        if path.suffix.lower() != ".pdf" or path.stat().st_size > MAX_ATTACHMENT_BYTES:
+            return None
+        data = path.read_bytes()
+    except OSError:
+        return None
+    if not data.startswith(b"%PDF-"):
+        return None
+    # Every build is cv.pdf; name the download after its job folder so they're distinguishable on the phone.
+    return f"{path.parent.name or 'resume'}.pdf", data
 
 
 def _strip_paths(text: str) -> str:

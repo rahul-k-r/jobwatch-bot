@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 from typing import Protocol
 
@@ -19,7 +20,7 @@ class Notifier(Protocol):
         """Deliver alerts; raise on failure so the jobs stay pending and retry next cycle."""
 
     async def send_text(self, title: str, message: str, priority: Priority = Priority.DEFAULT,
-                        click: str | None = None) -> None: ...
+                        click: str | None = None, attachment: tuple[str, bytes] | None = None) -> None: ...
 
 
 def _line(a: Alert) -> str:
@@ -34,7 +35,7 @@ class ConsoleNotifier:
             print(f"[ALERT p{int(a.priority)}] {_line(a)}\n    {a.job.url}", flush=True)
 
     async def send_text(self, title: str, message: str, priority: Priority = Priority.DEFAULT,
-                        click: str | None = None) -> None:
+                        click: str | None = None, attachment: tuple[str, bytes] | None = None) -> None:
         print(f"[NOTICE p{int(priority)}] {title}: {message}" + (f"\n    {click}" if click else ""), flush=True)
 
 
@@ -48,7 +49,9 @@ class NtfyNotifier:
             for a in alerts:
                 await self._publish(
                     title=f"{a.job.company}: {a.job.title}",
-                    message="\n".join(filter(None, ["; ".join(a.job.locations[:3]), ", ".join(a.labels)])),
+                    message="\n".join(filter(None, ["; ".join(a.job.locations[:3]),
+                                                    (a.job.classification or {}).get("highlights"),
+                                                    ", ".join(a.labels)])),
                     priority=a.priority,
                     click=a.job.url,
                     tags=["repeat"] if "repost" in a.labels else ["briefcase"],
@@ -66,19 +69,39 @@ class NtfyNotifier:
             )
 
     async def send_text(self, title: str, message: str, priority: Priority = Priority.DEFAULT,
-                        click: str | None = None) -> None:
-        await self._publish(title=title, message=message, priority=priority, click=click,
-                            tags=["page_facing_up"] if click else ["warning"])
+                        click: str | None = None, attachment: tuple[str, bytes] | None = None) -> None:
+        tags = ["page_facing_up"] if click else ["warning"]
+        if attachment:
+            try:
+                await self._publish(title, message, priority, click, tags, attachment)
+                return
+            except httpx.HTTPStatusError as e:
+                # Size/quota rejections won't succeed on retry; still deliver the notice. 429 and 5xx
+                # propagate so the result is retried with the PDF.
+                if e.response.status_code == 429 or e.response.status_code >= 500:
+                    raise
+                log.warning("ntfy rejected the attachment (%d); sending without it", e.response.status_code)
+                message = f"{message}\n(PDF not attached: ntfy returned {e.response.status_code})"
+        await self._publish(title, message, priority, click, tags)
 
-    async def _publish(self, title: str, message: str, priority: Priority, click: str | None, tags: list[str]) -> None:
-        # JSON publishing avoids header-encoding problems with non-ASCII titles.
+    async def _publish(self, title: str, message: str, priority: Priority, click: str | None, tags: list[str],
+                       attachment: tuple[str, bytes] | None = None) -> None:
         payload = {"topic": self.topic, "title": title, "message": message or title, "priority": int(priority),
                    "tags": tags}
         if click:
-            # Tap target alone is invisible once the notification is gone; the text copy and
-            # button keep the link usable from history and the web app.
+            # Tap target alone is invisible once the notification is gone; the text copy keeps the
+            # link usable from history and the web app.
             payload["message"] = f"{message}\n{click}" if message else click
             payload["click"] = click
-            payload["actions"] = [{"action": "view", "label": "Open posting", "url": click, "clear": False}]
-        resp = await self.client.post(self.url, json=payload, headers=self.headers)
+        if attachment:
+            # A file upload is the request body, so the fields go in query params; headers would
+            # break on non-ASCII titles.
+            filename, data = attachment
+            params = {k: v if isinstance(v, str) else json.dumps(v) for k, v in payload.items() if k != "topic"}
+            params["tags"], params["priority"] = ",".join(tags), str(int(priority))
+            resp = await self.client.put(f"{self.url}/{self.topic}", content=data,
+                                         params={**params, "filename": filename}, headers=self.headers)
+        else:
+            # JSON publishing avoids header-encoding problems with non-ASCII titles.
+            resp = await self.client.post(self.url, json=payload, headers=self.headers)
         resp.raise_for_status()

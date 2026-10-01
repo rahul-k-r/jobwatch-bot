@@ -73,7 +73,7 @@ cp .env.example .env                               # fill in what you use; every
 | `GEMINI_API_KEY` | Classification. Without it, alerts go out unclassified. |
 | `NTFY_TOPIC`, `NTFY_SERVER`, `NTFY_TOKEN` | Push delivery. Without a topic, alerts print to the console. |
 | `HEARTBEAT_URL` | Optional dead-man's switch (e.g. healthchecks.io), hit after every cycle. |
-| `HANDOFF_DIR` | Optional. Classified high-priority alerts are written to `inbox/` as JSON for another process; results it drops in `outbox/` are pushed as notifications. |
+| `HANDOFF_DIR` | Optional. Classified high-priority alerts are written to `inbox/` as JSON for another process; results it drops in `outbox/` are pushed as notifications. A `ready` result's `pdf` is attached to the push if it is a real PDF under 15 MB. |
 | `JOBWATCH_DB` | SQLite path (default `jobwatch.db`). |
 
 **Alerts on Android:** install ntfy, subscribe to your topic, and turn on instant delivery. On the

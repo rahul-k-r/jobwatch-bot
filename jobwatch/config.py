@@ -49,6 +49,9 @@ class Config:
     seed_max_pages: int = 50
     seed_page_delay: float = 1.0  # seeding is the one burst-shaped moment; Microsoft 429s on bursts
     max_concurrent_sources: int = 10  # ~90 sources at once caused connect timeouts through a VPN
+    # First cycle only: each source starts after a random 0..N s, so a restart doesn't hit shared
+    # backends (Eightfold hosts several companies) all at once.
+    startup_spread: float = 60
     us_only: bool = True
     exclude_min_years: int = 4
     require_sponsorship: bool = True
@@ -113,6 +116,7 @@ def load_config(path: str | Path) -> Config:
         offpeak=offpeak,
         max_pages=raw.get("max_pages", 5),
         seed_max_pages=raw.get("seed_max_pages", 50),
+        startup_spread=raw.get("startup_spread_seconds", 60),
         us_only=f.get("us_only", True),
         exclude_min_years=f.get("exclude_min_years", 4),
         require_sponsorship=f.get("require_sponsorship", True),
