@@ -1,0 +1,52 @@
+{
+ "hits": {
+  "total": {"value": 88, "relation": "eq"},
+  "hits": [
+   {
+    "_id": "c6293a9ff1ff",
+    "_source": {
+     "url": "https://careers.ibm.com/careers/JobDetail?jobId=134607",
+     "dcdate": "2026-09-26",
+     "title": "Application Developer - IT Service Management",
+     "body": "A career in IBM Consulting is built on long-term client relationships and close collaboration worldwide. As an Application Developer specializing in IT Service Management, you will utilize your expertise in managing and maintaining IT service management solutions.",
+     "field_keyword_05": "United States",
+     "field_keyword_08": "Software Engineering",
+     "field_keyword_17": "",
+     "field_keyword_18": "Professional",
+     "field_keyword_19": "BATON ROUGE, US",
+     "field_text_01": 134607
+    }
+   },
+   {
+    "_id": "b39579969192",
+    "_source": {
+     "url": "https://careers.ibm.com/careers/JobDetail?jobId=134599",
+     "dcdate": "2026-09-26",
+     "title": "Application Developer - IT Service Management",
+     "body": "A career in IBM Consulting is built on long-term client relationships and close collaboration worldwide. As an Application Developer specializing in IT Service Management, you will utilize your expertise in managing and maintaining IT service management solutions.",
+     "field_keyword_05": "United States",
+     "field_keyword_08": "Software Engineering",
+     "field_keyword_17": "",
+     "field_keyword_18": "Professional",
+     "field_keyword_19": "BATON ROUGE, US",
+     "field_text_01": 134599
+    }
+   },
+   {
+    "_id": "72d3a11a1add",
+    "_source": {
+     "url": "https://careers.ibm.com/careers/JobDetail?jobId=132407",
+     "dcdate": "2026-09-25",
+     "title": "Silicon Technology Research and Development Software Engineering Intern - 2027",
+     "body": "In this role, you will investigate the feasibility of applying software engineering and computational skills towards state-of-the-art chip architecture.",
+     "field_keyword_05": "United States",
+     "field_keyword_08": "Software Engineering",
+     "field_keyword_17": "",
+     "field_keyword_18": "Internship",
+     "field_keyword_19": "Multiple Cities",
+     "field_text_01": 132407
+    }
+   }
+  ]
+ }
+}

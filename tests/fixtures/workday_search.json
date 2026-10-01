@@ -1,0 +1,26 @@
+{
+ "total": 3,
+ "jobPostings": [
+  {
+   "title": "Software Engineer (MTS), Frontier Strike (EntSecTech)",
+   "externalPath": "/job/Washington---Bellevue/Software-Engineer--MTS---Frontier-Strike--EntSecTech-_JR361861",
+   "locationsText": "Washington - Bellevue",
+   "postedOn": "Posted Yesterday",
+   "bulletFields": ["JR361861"]
+  },
+  {
+   "title": "Member of Technical Staff — Machine Learning & Agent Security Engineering",
+   "externalPath": "/job/Washington---Bellevue/Member-of-Technical-Staff---Machine-Learning---Agent-Security-Engineering_JR358244",
+   "locationsText": "2 Locations",
+   "postedOn": "Posted Yesterday",
+   "bulletFields": ["Spotlight Job", "JR358244"]
+  },
+  {
+   "title": "Sr Solution Engineer",
+   "externalPath": "/job/California---Remote/Sr-Solution-Engineer_JR361902-1",
+   "locationsText": "California - Remote",
+   "postedOn": "Posted Yesterday",
+   "bulletFields": ["JR361902"]
+  }
+ ]
+}

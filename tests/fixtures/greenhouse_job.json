@@ -1,0 +1,19 @@
+{
+ "absolute_url": "https://job-boards.greenhouse.io/anthropic/jobs/5391151008",
+ "internal_job_id": 4532973008,
+ "location": {"name": "San Francisco, CA"},
+ "id": 5391151008,
+ "updated_at": "2026-08-24T19:47:05-04:00",
+ "title": "AI Operations Engineer, Partnerships",
+ "first_published": "2026-08-14T18:07:17-04:00",
+ "content": "&lt;div class=&quot;content-intro&quot;&gt;&lt;h2&gt;&lt;strong&gt;About Anthropic&lt;/strong&gt;&lt;/h2&gt;\n&lt;p&gt;Anthropic’s mission is to create reliable, interpretable, and steerable AI systems.&lt;/p&gt;&lt;/div&gt;&lt;h2&gt;You may be a good fit if you have&lt;/h2&gt;&lt;ul&gt;&lt;li&gt;3+ years of experience in software engineering&lt;/li&gt;&lt;/ul&gt;",
+ "offices": [
+  {
+   "id": 4001218008,
+   "name": "San Francisco, CA",
+   "location": "San Francisco, California, United States",
+   "child_ids": [],
+   "parent_id": null
+  }
+ ]
+}

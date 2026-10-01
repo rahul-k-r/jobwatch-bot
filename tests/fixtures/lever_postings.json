@@ -1,0 +1,35 @@
+[
+ {
+  "id": "ab7e3425-81d5-4705-a7b5-cd60c8a45cdb",
+  "text": "Backend Software Engineer - Application Development",
+  "hostedUrl": "https://jobs.lever.co/palantir/ab7e3425-81d5-4705-a7b5-cd60c8a45cdb",
+  "categories": {"commitment": "Full-time", "location": "New York, NY", "team": "Dev", "allLocations": ["New York, NY", "Washington, D.C."]},
+  "country": "US",
+  "createdAt": 1710191082166,
+  "descriptionPlain": "A World-Changing Company\nPalantir builds the world's leading software for data-driven decisions and operations.",
+  "lists": [
+   {"text": "Core Responsiblities", "content": "\n<li>Architecting, developing, and maintaining high-performance, scalable backend services</li>"},
+   {"text": "What We Require", "content": "\n<li>2+ years of experience with Java or Go</li>"}
+  ],
+  "additionalPlain": "Salary\nThe estimated salary range for this position is estimated to be $135,000 - $200,000/year."
+ },
+ {
+  "id": "6ed76ce8-4156-4b60-b120-403538bd66cd",
+  "text": "Forward Deployed Software Engineer",
+  "hostedUrl": "https://jobs.lever.co/palantir/6ed76ce8-4156-4b60-b120-403538bd66cd",
+  "categories": {"commitment": "Full-time", "location": "Singapore, Singapore", "team": "Dev", "allLocations": ["Singapore, Singapore"]},
+  "country": "SG",
+  "createdAt": 1786469891368,
+  "descriptionPlain": "x",
+  "lists": []
+ },
+ {
+  "id": "intern-1",
+  "text": "Software Engineer, Internship",
+  "hostedUrl": "https://jobs.lever.co/palantir/intern-1",
+  "categories": {"commitment": "Internship", "location": "New York, NY"},
+  "country": "US",
+  "createdAt": 1786469891368,
+  "descriptionPlain": "x"
+ }
+]

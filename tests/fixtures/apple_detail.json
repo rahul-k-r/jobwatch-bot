@@ -1,0 +1,13 @@
+{
+ "res": {
+  "id": "REQ-200685898",
+  "positionId": "200685898",
+  "postingTitle": "SDET Manager, Mail & Messages Automated Testing Frameworks",
+  "postDateInGMT": "2026-09-25T22:32:12.340+00:00",
+  "jobSummary": "As the SDET Manager for Mail & Messages Automated Testing Frameworks, you will lead the engineers who make sure those experiences are fast, reliable, accessible, and private on every Apple device.",
+  "description": "As the SDET Manager for Mail & Messages Automated Testing Frameworks, you will lead a team of engineers dedicated to the testability, coverage, and reliability of two of the most important communication apps in the world.",
+  "responsibilities": "Lead and grow a diverse group of engineers to improve the testability and test coverage of the Mail and Messages applications.\nOwn the design, build-out, and ongoing optimization of the automated testing frameworks.",
+  "minimumQualifications": "You care about supporting others and growing their careers.\nYou have a BS in Computer Science or equivalent experience.",
+  "preferredQualifications": "Extensive experience with XCTest, XCUITest, and Swift."
+ }
+}

@@ -1,0 +1,24 @@
+{
+ "status": 200,
+ "data": {
+  "id": 1970393557006899,
+  "displayJobId": "200057588",
+  "name": "Software Engineer II - Operating Systems",
+  "locations": ["United States, Washington, Redmond"],
+  "standardizedLocations": ["Redmond, WA, US"],
+  "postedTs": 1790373268,
+  "stars": 0,
+  "department": "Software Engineering",
+  "creationTs": 1790116323,
+  "jobDescription": "<b>Overview</b><br><p>The <strong>Developer Platform (DevPlat) team </strong>within<strong> Windows Servicing and Delivery (WSD)</strong> is a world-class customer-focused team with unique engineering challenges and ample opportunities to learn and build a career.</p><p>We are looking for a passionate <strong>Software Engineer II</strong> willing to work in a team environment and interested in learning broad feature areas, investigating, and solving complex problems for our customers.</p><br><br><b>Responsibilities</b><br><ul><li>You will be part of a software engineering team and will be working on Windows Input and Composition components such as mouse/keyboard/pen/touch input, IME (Input Method Editor), DWM (Desktop Window Manager), Desktop rendering, Desktop transparency, animations, and composition etc.</li><li>Creates and implements code for a product, service, or feature, reusing code as applicable.</li></ul><br><br><b>Qualifications</b><br><p><strong>Required Qualifications</strong></p><ul type=\"disc\"><li>Bachelor's Degree in Computer Science or related technical field AND 2+ years technical engineering experience with coding in languages including, but not limited to, C, C++, C#, Java, JavaScript, or Python<ul type=\"disc\"><li>OR equivalent experience.</li></ul></li></ul><p><strong>Other Requirements</strong></p><ul><li>Ability to meet Microsoft, customer and/or government security screening requirements are required for this role. These requirements include but are not limited to the following specialized security screenings:<ul><li><strong>Microsoft Cloud Background Check:</strong> This position will be required to pass the Microsoft Cloud background check upon hire/transfer and every two years thereafter. </li></ul></li></ul><p><strong>Preferred Qualifications</strong></p><ul type=\"disc\"><li>Ability to design and troubleshoot root cause complex issues in large systems like operating systems.</li><li>System programming experience.</li></ul><p>Software Engineering IC3 - The typical base pay range for this role across the U.S. is USD $102,100 - $202,200 per year.</p><p>This position will be open for a minimum of 5 days, with applications accepted on an ongoing basis until the position is filled.</p><br><hr><br><p>Microsoft is an equal opportunity employer. All qualified applicants will receive consideration for employment without regard to age, ancestry, citizenship, color, family or medical care leave, gender identity or expression, genetic information, immigration status, marital status, medical condition, national origin, physical or mental disability, political affiliation, protected veteran or military status, race, ethnicity, religion, sex (including pregnancy), sexual orientation, or any other characteristic protected by applicable local laws, regulations and ordinances.</p> ",
+  "location": "United States, Washington, Redmond",
+  "isHot": 0,
+  "workLocationOption": "onsite",
+  "locationFlexibility": null,
+  "atsJobId": "200057588",
+  "positionUrl": "/careers/job/1970393557006899",
+  "publicUrl": "https://apply.careers.microsoft.com/careers/job/1970393557006899",
+  "efcustomTextRoletype": ["Individual Contributor"],
+  "efcustomTextEmploymentType": ["Full-Time"]
+ }
+}

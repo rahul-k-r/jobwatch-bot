@@ -1,0 +1,59 @@
+{
+ "status": 200,
+ "data": {
+  "count": 367,
+  "positions": [
+   {
+    "id": 1970393556945260,
+    "displayJobId": "200045539",
+    "name": "Senior Software Engineer",
+    "locations": ["United States, Washington, Redmond"],
+    "standardizedLocations": ["Redmond, WA, US"],
+    "postedTs": 1790396681,
+    "solrScore": null,
+    "stars": 0,
+    "department": "Software Engineering",
+    "creationTs": 1785164284,
+    "isHot": 0,
+    "workLocationOption": "onsite",
+    "locationFlexibility": null,
+    "atsJobId": "200045539",
+    "positionUrl": "/careers/job/1970393556945260"
+   },
+   {
+    "id": 1970393557004819,
+    "displayJobId": "200057329",
+    "name": "Software Engineer: Intern Opportunity for University Students",
+    "locations": ["United States, California, Mountain View"],
+    "standardizedLocations": ["Mountain View, CA, US"],
+    "postedTs": 1790384704,
+    "solrScore": null,
+    "stars": 0,
+    "department": "Software Engineering",
+    "creationTs": 1790022634,
+    "isHot": 0,
+    "workLocationOption": "onsite",
+    "locationFlexibility": null,
+    "atsJobId": "200057329",
+    "positionUrl": "/careers/job/1970393557004819"
+   },
+   {
+    "id": 1970393557006899,
+    "displayJobId": "200057588",
+    "name": "Software Engineer II - Operating Systems",
+    "locations": ["United States, Washington, Redmond"],
+    "standardizedLocations": ["Redmond, WA, US"],
+    "postedTs": 1790373268,
+    "solrScore": null,
+    "stars": 0,
+    "department": "Software Engineering",
+    "creationTs": 1790116323,
+    "isHot": 0,
+    "workLocationOption": "onsite",
+    "locationFlexibility": null,
+    "atsJobId": "200057588",
+    "positionUrl": "/careers/job/1970393557006899"
+   }
+  ]
+ }
+}

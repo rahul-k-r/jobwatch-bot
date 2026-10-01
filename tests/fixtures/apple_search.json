@@ -1,0 +1,51 @@
+{
+ "res": {
+  "totalRecords": 1300,
+  "searchResults": [
+   {
+    "id": "200651071-0836",
+    "positionId": "200651071",
+    "reqId": "200651071-0836",
+    "type": "PIPE",
+    "postingTitle": "Senior Machine Learning Engineer, NLP,  Input Experience",
+    "transformedPostingTitle": "senior-machine-learning-engineer-nlp-input-experience",
+    "postDateInGMT": "2026-09-27T01:01:18.561Z",
+    "locations": [{"name": "Cupertino", "countryName": "United States of America", "countryID": "iso-country-USA"}],
+    "team": {"teamName": "Software and Services", "teamID": "teamsAndSubTeams-SFTWR", "teamCode": "SFTWR"}
+   },
+   {
+    "id": "200685421-0836",
+    "positionId": "200685421",
+    "reqId": "200685421-0836",
+    "type": "REQ",
+    "postingTitle": "Data Scientist - Capacity Planning - Apple Data Platform",
+    "transformedPostingTitle": "data-scientist-capacity-planning-apple-data-platform",
+    "postDateInGMT": "2026-09-26T14:53:43.567Z",
+    "locations": [{"name": "Cupertino", "countryName": "United States of America", "countryID": "iso-country-USA"}],
+    "team": {"teamName": "Software and Services", "teamID": "teamsAndSubTeams-SFTWR", "teamCode": "SFTWR"}
+   },
+   {
+    "id": "200685976-0670",
+    "positionId": "200685976",
+    "reqId": "200685976-0670",
+    "type": "PIPE",
+    "postingTitle": "Lead Designer, Design Systems & Structures",
+    "transformedPostingTitle": "lead-designer-design-systems-structures",
+    "postDateInGMT": "2026-09-26T06:56:05.885Z",
+    "locations": [{"name": "Culver City", "countryName": "United States of America", "countryID": "iso-country-USA"}],
+    "team": {"teamName": "Software and Services", "teamID": "teamsAndSubTeams-SFTWR", "teamCode": "SFTWR"}
+   },
+   {
+    "id": "200685976-2459",
+    "positionId": "200685976",
+    "reqId": "200685976-2459",
+    "type": "PIPE",
+    "postingTitle": "Lead Designer, Design Systems & Structures",
+    "transformedPostingTitle": "lead-designer-design-systems-structures",
+    "postDateInGMT": "2026-09-26T06:56:05.885Z",
+    "locations": [{"name": "New York City", "countryName": "United States of America", "countryID": "iso-country-USA"}],
+    "team": {"teamName": "Software and Services", "teamID": "teamsAndSubTeams-SFTWR", "teamCode": "SFTWR"}
+   }
+  ]
+ }
+}

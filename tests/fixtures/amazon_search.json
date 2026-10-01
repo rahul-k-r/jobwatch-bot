@@ -1,0 +1,42 @@
+{
+ "error": null,
+ "hits": 1732,
+ "jobs": [
+  {
+   "id_icims": "10560946",
+   "title": "Software I&T Engineer, Amazon Leo Optical Inter-Satellite Link ",
+   "location": "US, CA, Northridge",
+   "posted_date": "September 25, 2026",
+   "job_path": "/en/jobs/10560946/software-i-t-engineer-amazon-leo-optical-inter-satellite-link",
+   "description": "Amazon Leo is Amazon's low Earth orbit satellite network. Our mission is to deliver fast, reliable broadband connectivity to customers beyond the reach of existing networks.<br/><br/>Export Control Requirement: <br/>",
+   "basic_qualifications": "- 2+ years of non-internship professional software development testing experience<br/>- 1+ years of test automation frameworks and tools building experience<br/>- Experience programming with at least one modern language such as Java, C++, or C# including object-oriented design",
+   "preferred_qualifications": "- Knowledge of overall system architecture, scalability, reliability, and performance in a database environment<br/><br/>Amazon is an equal opportunity employer and does not discriminate on the basis of protected veteran status, disability, or other legally protected status.",
+   "job_category": "Software Development",
+   "country_code": "USA"
+  },
+  {
+   "id_icims": "10560727",
+   "title": "Software Development Engineer, Consumer Domains",
+   "location": "US, NJ, Newark",
+   "posted_date": "September 25, 2026",
+   "job_path": "/en/jobs/10560727/software-development-engineer-consumer-domains",
+   "description": "At Audible, we believe stories have the power to transform lives.<br/><br/>ABOUT YOU<br/>If you’re a dedicated problem solver, this is the role for you.",
+   "basic_qualifications": "- 1+ years of non-internship professional software development experience<br/>- Experience programming with at least one software programming language",
+   "preferred_qualifications": "- Bachelor's degree in computer science or equivalent<br/><br/>Amazon is an equal opportunity employer and does not discriminate on the basis of protected veteran status, disability, or other legally protected status.",
+   "job_category": "Software Development",
+   "country_code": "USA"
+  },
+  {
+   "id_icims": "10560316",
+   "title": "Software Development Engineer II, AWS Cross Domain Services (CDS)",
+   "location": "US, VA, Arlington",
+   "posted_date": "September 25, 2026",
+   "job_path": "/en/jobs/10560316/software-development-engineer-ii-aws-cross-domain-services-cds",
+   "description": "Amazon Web Services (AWS) is seeking a talented software development engineer to design and build customer facing cross-domain cloud services.",
+   "basic_qualifications": "- 3+ years of non-internship professional software development experience<br/>- 2+ years of non-internship design or architecture (design patterns, reliability and scaling) of new and existing systems experience",
+   "preferred_qualifications": "- 4+ years of full software development life cycle experience<br/>- Current, active US Government Security Clearance of TS/SCI with Polygraph<br/><br/>Amazon is an equal opportunity employer and does not discriminate on the basis of protected veteran status, disability, or other legally protected status.",
+   "job_category": "Software Development",
+   "country_code": "USA"
+  }
+ ]
+}

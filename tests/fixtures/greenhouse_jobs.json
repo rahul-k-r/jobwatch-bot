@@ -1,0 +1,27 @@
+{
+ "jobs": [
+  {
+   "absolute_url": "https://job-boards.greenhouse.io/anthropic/jobs/5391151008",
+   "internal_job_id": 4532973008,
+   "location": {"name": "San Francisco, CA"},
+   "id": 5391151008,
+   "updated_at": "2026-08-24T19:47:05-04:00",
+   "requisition_id": "266710",
+   "title": "AI Operations Engineer, Partnerships",
+   "company_name": "Anthropic",
+   "first_published": "2026-08-14T18:07:17-04:00"
+  },
+  {
+   "absolute_url": "https://job-boards.greenhouse.io/anthropic/jobs/5248983008",
+   "internal_job_id": 4486663008,
+   "location": {"name": "Sydney, Australia"},
+   "id": 5248983008,
+   "updated_at": "2026-09-29T06:00:37-04:00",
+   "requisition_id": "262880",
+   "title": "Applied AI Engineer ",
+   "company_name": "Anthropic",
+   "first_published": "2026-06-05T07:40:13-04:00"
+  }
+ ],
+ "meta": {"total": 2}
+}

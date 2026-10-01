@@ -1,0 +1,390 @@
+# Secrets and deployment settings live in .env (see .env.example).
+
+poll_interval_seconds: 300  # during busy hours; each site gets ~1 request per poll when nothing is new
+offpeak:                    # postings cluster in US business hours; poll slower otherwise
+  interval_seconds: 1800
+  timezone: America/Los_Angeles
+  busy_hours: [6, 21]       # local [start, end) hour
+  weekdays_only: true
+max_pages: 5          # per poll; stops earlier once a page has nothing new
+seed_max_pages: 100   # first run per company: record what's already open, alert on nothing (Eightfold is 10/page)
+
+filters:
+  us_only: true
+  require_sponsorship: true   # drop postings that rule out sponsorship / need US citizenship or clearance
+  exclude_min_years: 4        # drop when required qualifications ask for this many years or more (LLM)
+
+  # Title must match one of these to be considered at all.
+  include_title:
+    - '\bsoftware\b'
+    - '\b(sde|swe|sre)\b'
+    - '\bdeveloper\b'
+    - '\b(machine learning|ml|ai|deep learning|data|platform|infrastructure|back[- ]?end|front[- ]?end|full[- ]?stack|systems|cloud|devops|site reliability|reliability)\s+engineer'
+    # Customer-facing engineering (current field) and AI-specific titles; phrases, not bare "AI"/"Agent",
+    # so "AI Account Executive" or "Agent Support Specialist" don't match.
+    - '\bforward[- ]deployed\b'
+    - '\bdeployed engineer'
+    - '\bsolutions? (engineer|architect)'
+    - '\b(customer|integrations?) engineer'
+    - '\b(llm|agent|agentic|nlp|mlops|llmops|genai|generative ai|conversational ai|voice ai|speech)\s+engineer'
+    # Research roles; PhD-only postings are dropped by the classifier (phd_required).
+    - '\bresearch (engineer|scientist)'
+    - '\bresearcher\b'
+
+  # Senior markers. A title is dropped only if every part of a combo title
+  # ("Software Engineer II/Senior Software Engineer") is senior.
+  seniority_title:
+    - '\bsenior\b'
+    - '\bsr\b\.?'
+    - '\bprincipal\b'
+    - '(?<!technical )\bstaff\b'   # not "Member of Technical Staff"
+    - '\blead\b'
+    - '\bdirector\b'
+    - '\bmanager\b'
+    - '\bhead of\b'
+    - '\b(vp|vice president)\b'
+    - '(?<!solutions )(?<!solution )\barchitect\b'   # "Solutions Architect" is a role, not a level
+    - '\bdistinguished\b'
+    - '\bfellow\b'
+    - '\bchief\b'
+
+  # Dropped outright wherever they appear in the title.
+  exclude_title:
+    - '\bintern(ship)?\b'
+    - '\bco-?op\b'
+    - '\bstudent\b'
+    - '\btutor\b'   # xAI "AI Tutor": data-labeling contract work
+    - '\b(sourcer|recruit(er|ers|ing)|talent acquisition)\b'   # "Technical Sourcer, Research SWE"
+    - '\bsales\b'   # "Software Sales Specialist" passes the \bsoftware\b include
+    - '\b(embedded|firmware|fpga|asic|compilers?)\b'   # hardware / low-level work
+    - '\b(ts/sci|top secret|secret clearance|clearance required|poly(graph)?|ctj)\b'
+
+repost:
+  created_gap_days: 14   # heuristic: requisition created this long before posting => repost. Tune with real data.
+  similarity: 0.9        # description shingle overlap vs same-title postings
+  lookback_days: 90
+
+classifier:
+  enabled: true               # also needs GEMINI_API_KEY; without it, alerts are sent unclassified
+  model: gemini-flash-lite-latest
+  daily_limit: 450            # below the free tier's 500/day for headroom
+  requests_per_minute: 10
+  fallback_model: gemma-4-26b-a4b-it   # separate free quota; ~25s/call, so only used when the primary fails
+  fallback_daily_limit: 10000
+  fallback_requests_per_minute: 10
+  batch_size: 10
+
+sources:
+  - company: Microsoft
+    type: eightfold
+    host: apply.careers.microsoft.com
+    domain: microsoft.com
+    params:
+      location: United States
+      filter_include_remote: 1
+      filter_career_discipline: Software Engineering
+      filter_profession: software engineering
+    exclude_title:
+      - '\bIC ?[4-9]\b'   # Microsoft level codes: IC4 = Senior
+
+  - company: Amazon
+    type: amazon
+    params:
+      'category[]': software-development
+      country: USA
+    exclude_title:
+      - '\bIII\b'   # SDE III = Senior at Amazon (but mid-level at Google, so company-specific)
+
+  - company: Apple
+    type: apple
+    teams: [teamsAndSubTeams-SFTWR, teamsAndSubTeams-MLAI]   # Software & Services, ML & AI
+
+  - company: IBM
+    type: ibm
+
+  # feed.xml only: Google's results pages are robots.txt-disallowed and its ToS make that binding.
+  # The feed is regenerated every ~20-25 min; polls in between are cheap 304s.
+  # categories: [] = all. Customer Engineers are under SALES_OPERATIONS and DeepMind research
+  # scientists under INFORMATION_TECHNOLOGY, so title rules decide instead. Includes DeepMind and YouTube.
+  - company: Google
+    type: google
+    categories: []
+
+  # Older Eightfold API: Netflix hasn't enabled PCSX. robots.txt allows /api/apply.
+  - company: Netflix
+    type: eightfold
+    api: v2
+    host: explore.jobs.netflix.net
+    domain: netflix.com
+    params:
+      location: United States
+    exclude_title:
+      - '\bL[5-9]\b'                                           # "Software Engineer (L5)"; L5 = Senior
+      - '\b(engineer|engineering|scientist|developer)\s+[5-9]\b'   # "Analytics Engineer 5"
+
+  - company: Qualcomm
+    type: eightfold
+    host: careers.qualcomm.com
+    domain: qualcomm.com
+    params:
+      location: United States
+
+  # Workday tenants. Facet keys/IDs are tenant-specific (found via each tenant's `facets` response).
+  # US ID bc33aa3152ec42d4995f4791a106ed09 is global; tenants without a country facet are
+  # US-filtered client-side after the detail call.
+  - company: NVIDIA
+    type: workday
+    host: nvidia.wd5.myworkdayjobs.com
+    tenant: nvidia
+    site: NVIDIAExternalCareerSite
+    facets:
+      locationHierarchy1: [2fcb99c455831013ea52fb338f2932d8]   # United States (tenant-specific ID)
+      jobFamilyGroup: [0c40f6bd1d8f10ae43ffaefd46dc7e78]        # Engineering
+
+  - company: Red Hat
+    type: workday
+    host: redhat.wd5.myworkdayjobs.com
+    tenant: redhat
+    site: jobs
+    facets:
+      a: [bc33aa3152ec42d4995f4791a106ed09]   # yes, the country facet key is literally "a"
+
+  - company: Salesforce
+    type: workday
+    host: salesforce.wd12.myworkdayjobs.com
+    tenant: salesforce
+    site: External_Career_Site
+    facets:
+      CF_-_REC_-_LRV_-_Job_Posting_Anchor_-_Country_from_Job_Posting_Location_Extended: [bc33aa3152ec42d4995f4791a106ed09]
+      jobFamilyGroup: [14fa3452ec7c1011f90d0002a2100000]   # Software Engineering
+
+  - company: Adobe
+    type: workday
+    host: adobe.wd5.myworkdayjobs.com
+    tenant: adobe
+    site: external_experienced
+    facets:
+      locationCountry: [bc33aa3152ec42d4995f4791a106ed09]
+
+  - company: Intel
+    type: workday
+    host: intel.wd1.myworkdayjobs.com
+    tenant: intel
+    site: External
+    facets:
+      jobFamilyGroup: [ace7a3d23b7e01a0544279031a0ec85c]   # Software Engineering
+
+  - company: Cisco
+    type: workday
+    host: cisco.wd5.myworkdayjobs.com
+    tenant: cisco
+    site: Cisco_Careers
+    facets:
+      jobFamilyGroup: [2101eee3ea96016aef42a674fc016429]   # Engineering
+
+  - company: Workday
+    type: workday
+    host: workday.wd5.myworkdayjobs.com
+    tenant: workday
+    site: Workday
+    facets:
+      Location_Country: [bc33aa3152ec42d4995f4791a106ed09]
+
+  - company: PayPal
+    type: workday
+    host: paypal.wd1.myworkdayjobs.com
+    tenant: paypal
+    site: jobs
+
+  - company: Capital One
+    type: workday
+    host: capitalone.wd12.myworkdayjobs.com
+    tenant: capitalone
+    site: Capital_One
+    facets:
+      jobFamilyGroup: [23c40d87cd84100035bd7d9296540000]   # Software Engineering
+
+  - company: Visa
+    type: workday
+    host: visa.wd5.myworkdayjobs.com
+    tenant: visa
+    site: Visa
+    facets:
+      locationCountry: [bc33aa3152ec42d4995f4791a106ed09]
+
+  - company: Mastercard
+    type: workday
+    host: mastercard.wd1.myworkdayjobs.com
+    tenant: mastercard
+    site: CorporateCareers
+
+  - company: HP
+    type: workday
+    host: hp.wd5.myworkdayjobs.com
+    tenant: hp
+    site: ExternalCareerSite
+    facets:
+      Location_Country: [bc33aa3152ec42d4995f4791a106ed09]
+
+  - company: HPE
+    type: workday
+    host: hpe.wd5.myworkdayjobs.com
+    tenant: hpe
+    site: Jobsathpe
+
+  - company: Broadcom
+    type: workday
+    host: broadcom.wd1.myworkdayjobs.com
+    tenant: broadcom
+    site: External_Career
+
+  - company: CrowdStrike
+    type: workday
+    host: crowdstrike.wd5.myworkdayjobs.com
+    tenant: crowdstrike
+    site: crowdstrikecareers
+    facets:
+      locationCountry: [bc33aa3152ec42d4995f4791a106ed09]
+
+  # Jibe front end of AMD's iCIMS (the iCIMS portal itself is robots.txt Disallow: /).
+  - company: AMD
+    type: jibe
+    host: careers.amd.com
+    params:
+      country: United States
+    exclude_title:
+      - '\b[SP]?MTS\b'                    # AMD ladder: Senior < MTS < SMTS < PMTS
+      - '\bmember of technical staff\b'
+
+  # No country facet; US is checked client-side. Sales Systems Engineering family left out (presales).
+  - company: Palo Alto Networks
+    type: workday
+    host: paloaltonetworks.wd5.myworkdayjobs.com
+    tenant: paloaltonetworks
+    site: panwexternalcareers
+    facets:
+      jobFamilyGroup: [5aa443c785ff10453be1a6f2a173386b, 75835bfe2c0110f0a140d1bf54c5d362]   # Engineering, Customer Engineering & Support
+
+  # ATS boards: `board` is the slug from the public board URL.
+  - {company: "Hudson River Trading", type: "greenhouse", board: "wehrtyou"}
+  - {company: "Five Rings", type: "greenhouse", board: "fiveringsllc"}
+  - {company: "Headlands Technologies", type: "greenhouse", board: "headlandstechnologiesllc"}
+  - {company: "Jane Street", type: "greenhouse", board: "janestreet"}
+  - {company: "PDT Partners", type: "greenhouse", board: "pdtpartners"}
+  - {company: "xAI", type: "greenhouse", board: "xai"}
+  - {company: "Neuralink", type: "greenhouse", board: "neuralink"}
+  - {company: "Tenstorrent", type: "greenhouse", board: "tenstorrent"}
+  - {company: "Etched", type: "ashby", board: "etched"}
+  - {company: "Cerebras", type: "ashby", board: "cerebras"}
+  - {company: "Discord", type: "greenhouse", board: "discord"}
+  - {company: "Waymo", type: "greenhouse", board: "waymo"}
+  - {company: "Zoox", type: "lever", board: "zoox"}
+  - {company: "Linear", type: "ashby", board: "linear"}
+  - {company: "The Browser Company", type: "ashby", board: "the browser company"}
+  - {company: "Zed Industries", type: "ashby", board: "zed"}
+  - {company: "Notion", type: "ashby", board: "notion"}
+  - {company: "Figma", type: "greenhouse", board: "figma"}
+  - {company: "Stripe", type: "greenhouse", board: "stripe"}
+  - {company: "Databricks", type: "greenhouse", board: "databricks"}
+  - {company: "Snowflake", type: "ashby", board: "snowflake"}
+  - {company: "Midjourney", type: "ashby", board: "midjourney"}
+  - {company: "Airbnb", type: "greenhouse", board: "airbnb"}
+  - {company: "DoorDash", type: "greenhouse", board: "doordashusa"}
+  - {company: "Coinbase", type: "greenhouse", board: "coinbase"}
+  - {company: "Kraken", type: "ashby", board: "kraken.com"}
+  - {company: "Monad (Category Labs)", type: "ashby", board: "category-labs"}
+  - {company: "Paradigm", type: "ashby", board: "paradigm"}
+  - {company: "Trail of Bits", type: "workable", board: "trailofbits"}
+  # ITAR "U.S. person" or clearance on essentially every engineering role, so a visa holder can't take them.
+  - {company: "SpaceX", type: "greenhouse", board: "spacex", enabled: false}
+  - {company: "Anduril", type: "greenhouse", board: "andurilindustries", enabled: false}
+  - {company: "Shield AI", type: "lever", board: "shieldai", enabled: false}
+
+  - {company: "Anthropic", type: "greenhouse", board: "anthropic"}
+  - {company: "OpenAI", type: "ashby", board: "openai"}
+  - {company: "PolyAI", type: "greenhouse", board: "polyai"}
+  - {company: "Parloa", type: "greenhouse", board: "parloa"}
+  - {company: "Intercom", type: "greenhouse", board: "intercom"}
+  - {company: "Hume AI", type: "greenhouse", board: "humeai"}
+  - {company: "ElevenLabs", type: "ashby", board: "elevenlabs"}
+  - {company: "Deepgram", type: "ashby", board: "deepgram"}
+  - {company: "Vapi", type: "ashby", board: "vapi"}
+  - {company: "Bland AI", type: "ashby", board: "bland"}
+  - {company: "Airtable", type: "greenhouse", board: "airtable"}
+  - {company: "Vercel", type: "greenhouse", board: "vercel"}
+  - {company: "Temporal", type: "ashby", board: "temporal"}   # moved from Greenhouse
+  - {company: "Arize AI", type: "greenhouse", board: "arizeai"}
+  - {company: "RunPod", type: "ashby", board: "runpod"}   # moved from Greenhouse
+  - {company: "Weights & Biases (CoreWeave)", type: "greenhouse", board: "coreweave"}
+  - {company: "Glean", type: "greenhouse", board: "gleanwork"}
+  - {company: "Ada", type: "greenhouse", board: "ada", enabled: false}   # board gone (404); new platform not found
+  - {company: "LivePerson", type: "greenhouse", board: "liveperson"}
+  - {company: "Sierra", type: "ashby", board: "sierra"}
+  - {company: "Decagon", type: "ashby", board: "decagon"}
+  - {company: "Twilio", type: "greenhouse", board: "twilio"}
+  - {company: "Dialpad", type: "greenhouse", board: "dialpad"}
+  - {company: "Gong", type: "greenhouse", board: "gongio"}
+  - {company: "Lindy", type: "ashby", board: "lindy", enabled: false}   # board gone (404); new platform not found
+  - {company: "Speechmatics", type: "greenhouse", board: "speechmatics"}
+  - {company: "n8n", type: "ashby", board: "n8n"}
+  - {company: "Zapier", type: "ashby", board: "zapier"}
+  - {company: "Make.com (Celonis)", type: "greenhouse", board: "make"}
+  - {company: "Boomi", type: "greenhouse", board: "boomilp"}
+  - {company: "Cohere", type: "ashby", board: "cohere"}
+  - {company: "LangChain", type: "ashby", board: "langchain"}
+  - {company: "Pinecone", type: "ashby", board: "pinecone"}
+  - {company: "Mistral AI", type: "lever", board: "mistral", enabled: false}   # board empty; new platform not found
+  - {company: "Palantir", type: "lever", board: "palantir", interval_seconds: 900}   # ~6MB uncompressed per poll
+  - {company: "Later", type: "greenhouse", board: "later"}
+  - {company: "Safari AI", type: "greenhouse", board: "safariai"}
+  - {company: "Hootsuite", type: "greenhouse", board: "hootsuite"}
+  - {company: "Klue", type: "ashby", board: "klue"}
+  - {company: "Glacis AI", type: "ashby", board: "glacis-ai"}
+  - {company: "Sanctuary AI", type: "lever", board: "sanctuary", enabled: false}   # board gone (404); ashby "sanctuary" is a different company
+  - {company: "Semios", type: "workable", board: "semios"}
+  - {company: "Factorial", type: "greenhouse", board: "factorial", enabled: false}   # board gone (404); new platform not found
+  - {company: "Attio", type: "ashby", board: "attio"}
+  - {company: "Tinybird", type: "lever", board: "tinybird"}   # moved from Ashby
+  - {company: "Clarity AI", type: "greenhouse", board: "clarityai"}   # moved from Lever; ashby "clarity" is a different company
+  - {company: "Perk (TravelPerk)", type: "ashby", board: "perk"}   # renamed from TravelPerk
+  - {company: "Aleph Alpha", type: "ashby", board: "AlephAlpha", enabled: false}
+  - {company: "DeepL", type: "ashby", board: "DeepL", enabled: false}
+  - {company: "Black Forest Labs", type: "greenhouse", board: "blackforestlabs", enabled: false}
+  - {company: "Helsing", type: "greenhouse", board: "helsing", enabled: false}
+  - {company: "Celonis", type: "greenhouse", board: "celonis", enabled: false}
+  - {company: "Contentful", type: "greenhouse", board: "contentful", enabled: false}
+  - {company: "GetYourGuide", type: "greenhouse", board: "getyourguide", enabled: false}
+  - {company: "HelloFresh", type: "greenhouse", board: "hellofresh", enabled: false}
+  - {company: "N26", type: "greenhouse", board: "n26", enabled: false}
+  - {company: "Trade Republic", type: "greenhouse", board: "traderepublicbank", enabled: false}
+  - {company: "SumUp", type: "greenhouse", board: "sumup", enabled: false}
+  - {company: "Qonto", type: "lever", board: "qonto", enabled: false}
+  - {company: "Forto", type: "lever", board: "forto", enabled: false}
+  - {company: "Lakera", type: "ashby", board: "lakera.ai", enabled: false}   # board empty; new platform not found
+  - {company: "Scandit", type: "greenhouse", board: "scandit"}
+  - {company: "Cradle", type: "ashby", board: "cradlebio"}
+  - {company: "Hugging Face", type: "workable", board: "huggingface"}
+  - {company: "Photoroom", type: "ashby", board: "photoroom"}
+  - {company: "Pigment", type: "lever", board: "pigment"}
+  - {company: "Wayve", type: "greenhouse", board: "wayve"}
+  - {company: "Isomorphic Labs", type: "greenhouse", board: "isomorphiclabs"}
+  - {company: "PhysicsX", type: "greenhouse", board: "physicsx"}
+  - {company: "Stability AI", type: "greenhouse", board: "stabilityai"}
+  - {company: "Synthesia", type: "ashby", board: "synthesia"}
+  - {company: "Faculty", type: "ashby", board: "faculty"}
+  - {company: "Causaly", type: "ashby", board: "causaly"}
+  - {company: "Lovable", type: "ashby", board: "lovable", enabled: false}
+  - {company: "Legora", type: "ashby", board: "legora", enabled: false}
+  - {company: "Spotify", type: "lever", board: "spotify", enabled: false}
+  - {company: "Vinted", type: "lever", board: "vinted", enabled: false}
+  - {company: "Amplemarket", type: "greenhouse", board: "amplemarket", enabled: false}
+  - {company: "Perplexity", type: "ashby", board: "perplexity"}
+  - {company: "Clay Labs", type: "ashby", board: "claylabs"}
+  - {company: "Runway", type: "ashby", board: "runway-ml"}   # moved from Greenhouse; ashby "runway" is a different company
+  - {company: "Hightouch", type: "greenhouse", board: "hightouch"}
+  - {company: "WorkOS", type: "ashby", board: "workos"}
+  - {company: "Supabase", type: "ashby", board: "supabase"}
+  - {company: "Resend", type: "ashby", board: "resend"}
+  - {company: "Clerk", type: "ashby", board: "clerk"}
+  - {company: "Inngest", type: "ashby", board: "inngest"}
+  - {company: "PlanetScale", type: "greenhouse", board: "planetscale"}
