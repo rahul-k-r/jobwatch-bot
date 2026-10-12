@@ -15,7 +15,7 @@ poll source (newest first, stop at first page with nothing new)
   ├─ detail fetch     description (+ locations for Workday)
   ├─ US + sponsorship "must be a U.S. citizen", "unable to sponsor", ITAR, clearance … → filtered
   ├─ repost signals   old requisition, reused req ID, near-identical text, "reposted" → low priority
-  ├─ Gemini (batched) role scope / level / required years / PhD / sponsorship; failure → alert as "unclassified"
+  ├─ Gemini (batched) role scope / level / required years / PhD / sponsorship; failure → held and retried, then alert as "unclassified"
   └─ ntfy push        marked notified only after delivery succeeds; otherwise retried next cycle
 ```
 
@@ -72,6 +72,7 @@ cp .env.example .env                               # fill in what you use; every
 |---|---|
 | `GEMINI_API_KEY` | Classification. Without it, alerts go out unclassified. |
 | `NTFY_TOPIC`, `NTFY_SERVER`, `NTFY_TOKEN` | Push delivery. Without a topic, alerts print to the console. |
+| `NTFY_TOPIC_RESUMES`, `NTFY_TOPIC_LOW` | Optional separate topics for handoff results ("Resume ready") and for low-priority alerts such as reposts. Each falls back to `NTFY_TOPIC`. |
 | `HEARTBEAT_URL` | Optional dead-man's switch (e.g. healthchecks.io), hit after every cycle. |
 | `HANDOFF_DIR` | Optional. Classified high-priority alerts are written to `inbox/` as JSON for another process; results it drops in `outbox/` are pushed as notifications. A `ready` result's `pdf` is attached to the push if it is a real PDF under 15 MB. |
 | `JOBWATCH_DB` | SQLite path (default `jobwatch.db`). |
@@ -91,6 +92,10 @@ Master's-degree path when several are listed), whether a PhD is strictly require
 restrictions and repost mentions. Out-of-scope roles, postings needing 4+ years, a PhD with no
 Master's alternative, or ruling out sponsorship are dropped. Usage is capped per day below the free
 tier.
+
+If neither model can be reached, the posting stays pending and is retried each cycle for
+`classify_grace_seconds` (default 900); one "Classifier unreachable" push goes out per outage. After
+that it alerts as "unclassified", so an outage can delay a posting but never lose it.
 
 ## Docker
 

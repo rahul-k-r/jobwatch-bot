@@ -106,6 +106,41 @@ async def test_attachment_rate_limit_raises_for_retry():
 
 
 @respx.mock
+async def test_postings_resumes_and_reposts_go_to_separate_topics(tmp_path):
+    posts = respx.post(SERVER).mock(return_value=httpx.Response(200))
+    upload = respx.put(f"{SERVER}/cvs").mock(return_value=httpx.Response(200))
+    async with httpx.AsyncClient() as client:
+        n = NtfyNotifier(client, SERVER, "jobs", resume_topic="cvs", low_topic="low")
+        await n.send([Alert(make_job("1"), Priority.HIGH), Alert(make_job("2"), Priority.LOW, ["repost: x"])])
+        await n.send_text("Resume not built: Acme - SWE", "fact check failed", channel="resumes")
+        await n.send_text("Resume ready: Acme - SWE", "a/cv.pdf", Priority.HIGH, channel="resumes",
+                          attachment=("a.pdf", b"%PDF-1.5"))
+        await n.send_text("Acme source failing", "3 failed polls")  # operational notices stay on the main topic
+    assert [p["topic"] for p in payloads(posts)] == ["jobs", "low", "cvs", "jobs"]
+    assert upload.call_count == 1
+
+
+@respx.mock
+async def test_low_priority_digest_goes_to_the_low_topic():
+    route = respx.post(SERVER).mock(return_value=httpx.Response(200))
+    alerts = [Alert(make_job(str(i)), Priority.LOW, ["repost: x"]) for i in range(6)]
+    async with httpx.AsyncClient() as client:
+        await NtfyNotifier(client, SERVER, "jobs", low_topic="low").send(alerts)
+    [p] = payloads(route)
+    assert p["topic"] == "low" and p["title"] == "6 new postings"
+
+
+@respx.mock
+async def test_unset_channels_fall_back_to_the_main_topic():
+    route = respx.post(SERVER).mock(return_value=httpx.Response(200))
+    async with httpx.AsyncClient() as client:
+        n = NtfyNotifier(client, SERVER, "jobs")
+        await n.send([Alert(make_job("2"), Priority.LOW, ["repost: x"])])
+        await n.send_text("Resume ready: Acme - SWE", "a/cv.pdf", channel="resumes")
+    assert [p["topic"] for p in payloads(route)] == ["jobs", "jobs"]
+
+
+@respx.mock
 async def test_burst_becomes_one_digest_per_priority():
     route = respx.post(SERVER).mock(return_value=httpx.Response(200))
     alerts = [Alert(make_job(str(i)), Priority.HIGH) for i in range(6)]

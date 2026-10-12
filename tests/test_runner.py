@@ -43,7 +43,7 @@ class FakeNotifier:
             raise RuntimeError("ntfy down")
         self.sent.extend(alerts)
 
-    async def send_text(self, title, message, priority=Priority.DEFAULT, click=None, attachment=None):
+    async def send_text(self, title, message, priority=Priority.DEFAULT, click=None, attachment=None, channel=None):
         if self.fail:
             raise RuntimeError("ntfy down")
         self.notices.append(title)
@@ -58,6 +58,21 @@ class FakeClassifier:
     async def classify(self, jobs):
         return {j.key: {"level": "mid", "min_years": 2, "mentions_repost": False, "sponsorship": "unspecified",
                         "phd_required": False, "reason": "r", **self.overrides.get(j.source_id, {})} for j in jobs}
+
+
+class DownClassifier:
+    """Both models unreachable: nothing comes back."""
+
+    async def classify(self, jobs):
+        return {}
+
+
+class PartialClassifier(FakeClassifier):
+    """Only the first job of a batch gets classified before the API drops out."""
+
+    async def classify(self, jobs):
+        out = await super().classify(jobs)
+        return {jobs[0].key: out[jobs[0].key]}
 
 
 def watcher(db, source, notifier, clock=lambda: NOW, classifier=None, handoff=None, **cfg):
@@ -264,6 +279,89 @@ async def test_only_real_pdfs_are_uploaded(db, tmp_path):
     await watcher(db, FakeSource([]), n, handoff=handoff).deliver_handoff_results()
     assert n.attachments == [None, None, None]
     assert all("not attached" in msg for _, msg, _, _ in n.texts)
+
+
+async def test_new_postings_carry_the_previous_successful_poll_time(db):
+    # A date-only posted_at can't say when in the day it appeared; the poll before it can.
+    src = FakeSource([[make_job("0", "Software Engineer")]])
+    n, clock = FakeNotifier(), Clock()
+    w = watcher(db, src, n, clock=clock, poll_interval=300)
+    await run_at(w, clock, 0)  # seeds; counts as a successful poll
+    assert db.last_polled("Acme") == NOW
+    src.page_list = [[make_job("1", "Software Engineer II"), make_job("0", "Software Engineer")]]
+    await run_at(w, clock, 300)
+    assert n.sent[0].job.prev_poll_at == NOW
+    assert db.last_polled("Acme") == NOW + timedelta(seconds=300)
+
+
+async def test_a_failed_poll_does_not_move_the_last_successful_poll(db):
+    src = FakeSource([[make_job("0", "Software Engineer")]])
+    clock = Clock()
+    w = watcher(db, src, FakeNotifier(), clock=clock, poll_interval=300)
+    await run_at(w, clock, 0)
+    src.fail = True
+    await run_at(w, clock, 300)
+    assert db.last_polled("Acme") == NOW
+
+
+def classifier_notices(n):
+    return [t for t in n.notices if t == "Classifier unreachable"]
+
+
+async def _waiting_watcher(db, count=5):
+    """Seeded watcher whose classifier is down, with `count` new postings just discovered at t=300."""
+    src = FakeSource([[make_job("0", "Software Engineer")]])
+    n, clock = FakeNotifier(), Clock()
+    w = watcher(db, src, n, clock=clock, classifier=DownClassifier(), poll_interval=300, classify_grace_seconds=900)
+    await run_at(w, clock, 0)  # seeds
+    src.page_list = [[make_job(str(i), "Software Engineer II") for i in range(1, count + 1)]]
+    await run_at(w, clock, 300)
+    return w, src, n, clock
+
+
+async def test_unclassifiable_postings_wait_instead_of_alerting_unclassified(db):
+    w, _, n, clock = await _waiting_watcher(db)
+    assert n.sent == []
+    assert len(db.pending()) == 5  # kept for the next cycle, not marked notified
+    await run_at(w, clock, 600)
+    assert n.sent == [] and len(db.pending()) == 5
+
+
+async def test_five_waiting_postings_send_one_notice_not_five(db):
+    w, _, n, clock = await _waiting_watcher(db, count=5)
+    assert len(classifier_notices(n)) == 1
+    await run_at(w, clock, 600)  # still down: no repeat
+    assert len(classifier_notices(n)) == 1
+    title, message, *_ = next(t for t in n.texts if t[0] == "Classifier unreachable")
+    assert "5 postings" in message
+
+
+async def test_postings_alert_unclassified_once_the_grace_period_is_up(db):
+    w, _, n, clock = await _waiting_watcher(db)
+    await run_at(w, clock, 1300)  # first failed at t=300, grace 900
+    assert len(n.sent) == 5 and all("unclassified" in a.labels for a in n.sent)
+    assert db.pending() == []
+    assert len(classifier_notices(n)) == 1  # failing open doesn't add a second push
+
+
+async def test_waiting_postings_are_classified_when_the_classifier_recovers(db):
+    w, src, n, clock = await _waiting_watcher(db)
+    w.classifier = FakeClassifier()
+    await run_at(w, clock, 600)
+    assert len(n.sent) == 5 and not any("unclassified" in a.labels for a in n.sent)
+    # A later outage is a new incident and notifies again.
+    w.classifier = DownClassifier()
+    src.page_list = [[make_job("9", "Software Engineer II")]]
+    await run_at(w, clock, 900)
+    assert len(classifier_notices(n)) == 2
+
+
+async def test_partially_classified_batch_alerts_the_classified_and_holds_the_rest(db):
+    w, _, n, clock = await _waiting_watcher(db, count=2)
+    w.classifier = PartialClassifier()
+    await run_at(w, clock, 600)
+    assert [a.job.source_id for a in n.sent] == ["1"]
+    assert [j.source_id for j in db.pending()] == ["2"]
 
 
 async def test_repost_is_alerted_at_low_priority(db):

@@ -5,7 +5,8 @@ from jobwatch.config import load_config
 
 @pytest.fixture
 def clean_env(monkeypatch):
-    for var in ("GEMINI_API_KEY", "NTFY_TOPIC", "NTFY_SERVER", "NTFY_TOKEN", "HEARTBEAT_URL", "JOBWATCH_DB"):
+    for var in ("GEMINI_API_KEY", "NTFY_TOPIC", "NTFY_TOPIC_RESUMES", "NTFY_TOPIC_LOW", "NTFY_SERVER", "NTFY_TOKEN",
+                "HEARTBEAT_URL", "JOBWATCH_DB"):
         monkeypatch.delenv(var, raising=False)
     return monkeypatch
 
@@ -48,3 +49,12 @@ def test_env_enables_integrations(clean_env):
     cfg = load_config("config.yaml")
     assert cfg.classifier.api_key == "k" and cfg.classifier.batch_size == 10
     assert (cfg.ntfy.server, cfg.ntfy.topic, cfg.ntfy.token) == ("https://ntfy.sh", "t", "tk_x")
+    assert (cfg.ntfy.resume_topic, cfg.ntfy.low_topic) == (None, None)
+
+
+def test_separate_topics_for_resumes_and_low_priority(clean_env):
+    clean_env.setenv("NTFY_TOPIC", "t")
+    clean_env.setenv("NTFY_TOPIC_RESUMES", "cvs")
+    clean_env.setenv("NTFY_TOPIC_LOW", "low")
+    cfg = load_config("config.yaml")
+    assert (cfg.ntfy.topic, cfg.ntfy.resume_topic, cfg.ntfy.low_topic) == ("t", "cvs", "low")

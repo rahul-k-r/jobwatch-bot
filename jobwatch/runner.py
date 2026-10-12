@@ -45,6 +45,8 @@ class Watcher:
         self.failures: dict[str, int] = {}
         self.retry_at: dict[str, datetime] = {}
         self.last_poll: dict[str, datetime] = {}
+        self.classify_failed_since: dict[str, datetime] = {}
+        self.classifier_down = False  # one notice per outage, however many postings are waiting
         self.started = False
 
     async def cycle(self, client: httpx.AsyncClient) -> None:
@@ -83,6 +85,7 @@ class Watcher:
             if n == self.cfg.failure_alert_after:
                 await self._notice(f"{name} source failing", f"{n} failed polls in a row. Last error: {e!r}"[:500])
             return
+        self.db.mark_polled(name, now)
         self.retry_at.pop(name, None)
         if self.failures.pop(name, 0) >= self.cfg.failure_alert_after:
             await self._notice(f"{name} source recovered", "Polling works again.")
@@ -90,6 +93,7 @@ class Watcher:
     async def poll_source(self, client: httpx.AsyncClient, source: Source) -> None:
         seeding = not self.db.is_seeded(source.company)
         max_pages = self.cfg.seed_max_pages if seeding else self.cfg.max_pages
+        prev_poll = self.db.last_polled(source.company)
         pages = 0
         async for page in source.pages(client):
             pages += 1
@@ -99,6 +103,7 @@ class Watcher:
                 self.db.insert_many(fresh, "seeded", self.clock())
             else:
                 for job in fresh:
+                    job.prev_poll_at = prev_poll
                     await self._admit(client, source, job)
             if (not seeding and not fresh) or pages >= max_pages:
                 break
@@ -140,14 +145,12 @@ class Watcher:
         if not jobs:
             return
         todo = [j for j in jobs if j.classification is None]
-        if self.classifier and todo:
-            results = await self.classifier.classify(todo)
-            for j in todo:
-                # Stored even when unclassified so a failed alert retry doesn't spend another LLM call.
-                j.classification = results.get(j.key, {"unclassified": True})
+        waiting = await self._classify(todo) if self.classifier and todo else set()
 
         alerts = []
         for job in jobs:
+            if job.key in waiting:
+                continue  # stays pending; retried next cycle
             c = job.classification or {}
             if c and not c.get("unclassified"):
                 if reason := exclusion_reason(c, self.cfg.exclude_min_years, self.cfg.require_sponsorship):
@@ -175,6 +178,36 @@ class Watcher:
                 except OSError as e:
                     log.error("could not hand %s off for a resume: %r", a.job.key, e)
 
+    async def _classify(self, todo: list[Job]) -> set[str]:
+        """Classifies `todo` in place; returns the keys that should keep waiting for a later cycle."""
+        results = await self.classifier.classify(todo)
+        now = self.clock()
+        waiting: set[str] = set()
+        for j in todo:
+            if j.key in results:
+                j.classification = results[j.key]
+                self.classify_failed_since.pop(j.key, None)
+                continue
+            since = self.classify_failed_since.setdefault(j.key, now)
+            if (now - since).total_seconds() < self.cfg.classify_grace_seconds:
+                waiting.add(j.key)
+            else:
+                # Fail open so an outage can't cost a posting. Stored so a failed alert retry
+                # doesn't spend another LLM call.
+                j.classification = {"unclassified": True}
+                self.classify_failed_since.pop(j.key, None)
+        if len(waiting) == 0 and all(j.key in results for j in todo):
+            self.classifier_down = False
+        elif waiting and not self.classifier_down:
+            self.classifier_down = True
+            n = len(waiting)
+            await self._notice(
+                "Classifier unreachable",
+                f"{n} posting{'s' if n != 1 else ''} held for another try. "
+                f"They alert unclassified after {self.cfg.classify_grace_seconds // 60} min. Check the network or VPN.",
+            )
+        return waiting
+
     @staticmethod
     def _wants_resume(alert: Alert) -> bool:
         # A CV build takes minutes of Claude time; only spend it on jobs the classifier has cleared.
@@ -195,7 +228,8 @@ class Watcher:
             else:
                 title, message, priority = f"Resume not built: {name}", _strip_paths(str(r.get("reason"))), Priority.DEFAULT
             try:
-                await self.notifier.send_text(title, message, priority, click=r.get("url"), attachment=attachment)
+                await self.notifier.send_text(title, message, priority, click=r.get("url"), attachment=attachment,
+                                              channel="resumes")
             except Exception as e:
                 log.error("could not send %r, will retry: %r", title, e)
                 continue
@@ -262,7 +296,9 @@ async def run(cfg: Config, once: bool = False) -> None:
     db = DB(cfg.db_path)
     async with httpx.AsyncClient(timeout=30, headers={"User-Agent": USER_AGENT}, follow_redirects=True) as client:
         notifier: Notifier = (
-            NtfyNotifier(client, cfg.ntfy.server, cfg.ntfy.topic, cfg.ntfy.token) if cfg.ntfy else ConsoleNotifier()
+            NtfyNotifier(client, cfg.ntfy.server, cfg.ntfy.topic, cfg.ntfy.token,
+                         resume_topic=cfg.ntfy.resume_topic, low_topic=cfg.ntfy.low_topic)
+            if cfg.ntfy else ConsoleNotifier()
         )
         classifier = GeminiClassifier(cfg.classifier, db, client) if cfg.classifier else None
         handoff = Handoff(cfg.handoff_dir) if cfg.handoff_dir else None

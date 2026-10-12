@@ -18,8 +18,10 @@ from jobwatch.sources import Source, build_source
 @dataclass
 class NtfyConfig:
     server: str
-    topic: str
+    topic: str  # new postings and operational notices
     token: str | None
+    resume_topic: str | None = None  # "Resume ready / not built"; falls back to `topic`
+    low_topic: str | None = None  # reposts and other low-priority alerts; falls back to `topic`
 
 
 @dataclass
@@ -57,6 +59,9 @@ class Config:
     require_sponsorship: bool = True
     repost: RepostRules = field(default_factory=RepostRules)
     classifier: ClassifierConfig | None = None
+    # A posting the classifier couldn't reach waits this long (retried every cycle) before it alerts
+    # unclassified, so a short outage doesn't skip the seniority/sponsorship/scope filters.
+    classify_grace_seconds: int = 900
     ntfy: NtfyConfig | None = None
     db_path: str = "jobwatch.db"
     heartbeat_url: str | None = None
@@ -96,7 +101,9 @@ def load_config(path: str | Path) -> Config:
 
     ntfy = None
     if topic := os.getenv("NTFY_TOPIC"):
-        ntfy = NtfyConfig(os.getenv("NTFY_SERVER", "https://ntfy.sh"), topic, os.getenv("NTFY_TOKEN") or None)
+        ntfy = NtfyConfig(os.getenv("NTFY_SERVER", "https://ntfy.sh"), topic, os.getenv("NTFY_TOKEN") or None,
+                          resume_topic=os.getenv("NTFY_TOPIC_RESUMES") or None,
+                          low_topic=os.getenv("NTFY_TOPIC_LOW") or None)
 
     offpeak = None
     if (o := raw.get("offpeak")) and o.get("enabled", True):
@@ -122,6 +129,7 @@ def load_config(path: str | Path) -> Config:
         require_sponsorship=f.get("require_sponsorship", True),
         repost=RepostRules(**raw.get("repost", {})),
         classifier=classifier,
+        classify_grace_seconds=raw.get("classify_grace_seconds", 900),
         ntfy=ntfy,
         db_path=os.getenv("JOBWATCH_DB", "jobwatch.db"),
         heartbeat_url=os.getenv("HEARTBEAT_URL") or None,

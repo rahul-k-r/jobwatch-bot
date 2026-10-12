@@ -28,6 +28,7 @@ CREATE INDEX IF NOT EXISTS jobs_company_title ON jobs (company, norm_title);
 CREATE INDEX IF NOT EXISTS jobs_status ON jobs (status);
 CREATE TABLE IF NOT EXISTS llm_usage (day TEXT PRIMARY KEY, requests INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS seeded_companies (company TEXT PRIMARY KEY, seeded_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS source_polls (company TEXT PRIMARY KEY, last_success TEXT NOT NULL);
 """
 
 
@@ -56,6 +57,18 @@ class DB:
 
     def mark_seeded(self, company: str, now: datetime) -> None:
         self.conn.execute("INSERT OR IGNORE INTO seeded_companies VALUES (?, ?)", (company, now.isoformat()))
+        self.conn.commit()
+
+    # Persisted so the first poll after a restart (or a laptop that was off) still knows the gap.
+    def last_polled(self, company: str) -> datetime | None:
+        row = self.conn.execute("SELECT last_success FROM source_polls WHERE company = ?", (company,)).fetchone()
+        return datetime.fromisoformat(row[0]) if row else None
+
+    def mark_polled(self, company: str, at: datetime) -> None:
+        self.conn.execute(
+            "INSERT INTO source_polls VALUES (?, ?) ON CONFLICT(company) DO UPDATE SET last_success = excluded.last_success",
+            (company, at.isoformat()),
+        )
         self.conn.commit()
 
     def known_keys(self, keys: Iterable[str]) -> set[str]:

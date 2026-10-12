@@ -23,6 +23,8 @@ class Job:
     ai_instructions: list[str] = field(default_factory=list)  # sentences in the posting addressing AI tools
     ai_policy: list[str] = field(default_factory=list)  # e.g. "AI-generated applications will be rejected"
     canaries: list[str] = field(default_factory=list)  # phrases those instructions try to plant in a CV
+    # Last successful poll of this company before the one that found the job: the job appeared after it.
+    prev_poll_at: datetime | None = None
 
     @property
     def key(self) -> str:
@@ -30,16 +32,19 @@ class Job:
 
     def to_dict(self) -> dict[str, Any]:
         d = dataclasses.asdict(self)
-        for k in ("posted_at", "created_at"):
+        for k in _DATETIMES:
             d[k] = d[k].isoformat() if d[k] else None
         return d
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> Job:
         d = dict(d)
-        for k in ("posted_at", "created_at"):
-            d[k] = datetime.fromisoformat(d[k]) if d[k] else None
+        for k in _DATETIMES:
+            d[k] = datetime.fromisoformat(d[k]) if d.get(k) else None
         return cls(**d)
+
+
+_DATETIMES = ("posted_at", "created_at", "prev_poll_at")
 
 
 class Priority(IntEnum):
