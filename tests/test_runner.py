@@ -36,19 +36,21 @@ class FakeSource(Source):
 class FakeNotifier:
     def __init__(self):
         self.sent, self.notices, self.fail = [], [], False
-        self.texts, self.attachments = [], []
+        self.texts, self.attachments, self.copies = [], [], []
 
     async def send(self, alerts):
         if self.fail:
             raise RuntimeError("ntfy down")
         self.sent.extend(alerts)
 
-    async def send_text(self, title, message, priority=Priority.DEFAULT, click=None, attachment=None, channel=None):
+    async def send_text(self, title, message, priority=Priority.DEFAULT, click=None, attachment=None, channel=None,
+                        copy=None):
         if self.fail:
             raise RuntimeError("ntfy down")
         self.notices.append(title)
         self.texts.append((title, message, priority, click))
         self.attachments.append(attachment)
+        self.copies.append(copy)
 
 
 class FakeClassifier:
@@ -281,6 +283,41 @@ async def test_only_real_pdfs_are_uploaded(db, tmp_path):
     assert all("not attached" in msg for _, msg, _, _ in n.texts)
 
 
+async def test_drafted_answers_become_one_copy_button(db, tmp_path):
+    import json
+
+    from jobwatch.handoff import Handoff
+
+    handoff = Handoff(tmp_path)
+    (handoff.outbox / "a.json").write_text(json.dumps({
+        "key": "Acme:1", "company": "Acme", "title": "FDE", "url": "https://x/1", "status": "ready", "pdf": None,
+        "answers": [{"question": "Why Acme?", "answer": "Because."},
+                    {"question": "Second example:", "answer": "[fill in: example]"}]}), encoding="utf-8")
+    (handoff.outbox / "b.json").write_text(json.dumps({
+        "key": "Acme:2", "company": "Acme", "title": "SWE", "url": "https://x/2", "status": "ready", "pdf": None,
+        "answers": []}), encoding="utf-8")
+    n = FakeNotifier()
+    await watcher(db, FakeSource([]), n, handoff=handoff).deliver_handoff_results()
+    assert n.copies == [("Copy answers", "Q: Why Acme?\nA: Because.\n\nQ: Second example:\nA: [fill in: example]"),
+                        None]
+    assert "2 application answers drafted" in n.texts[0][1]
+
+
+def test_copy_text_is_trimmed_to_what_ntfy_accepts():
+    import json
+    from urllib.parse import urlencode
+
+    from jobwatch.runner import MAX_COPY_ENCODED, answers_copy
+
+    answers = [{"question": f"Question {i}?", "answer": "word – " * 150} for i in range(4)]
+    text, dropped = answers_copy(answers)
+    # The upload sends the button in the URL; a long one got 414 from ntfy.sh.
+    assert len(urlencode({"actions": json.dumps([{"action": "copy", "label": "Copy answers", "value": text}])})) \
+        <= MAX_COPY_ENCODED
+    assert text.startswith("Q: Question 0?") and dropped == 4 - text.count("Q: ")
+    assert dropped > 0
+
+
 async def test_new_postings_carry_the_previous_successful_poll_time(db):
     # A date-only posted_at can't say when in the day it appeared; the poll before it can.
     src = FakeSource([[make_job("0", "Software Engineer")]])
@@ -373,6 +410,35 @@ async def test_repost_is_alerted_at_low_priority(db):
     await w.cycle(None)
     assert n.sent[0].priority == Priority.LOW
     assert any(label.startswith("repost") for label in n.sent[0].labels)
+
+
+async def _alert_with_snooze(db, until, **new_job):
+    src = FakeSource([[make_job("0", "Software Engineer")]])
+    n = FakeNotifier()
+    w = watcher(db, src, n, snoozes={"Acme": until})
+    await w.cycle(None)
+    src.page_list = [[make_job("1", "Software Engineer", **new_job)]]
+    await w.cycle(None)
+    return n.sent[0]
+
+
+async def test_snoozed_source_alerts_at_low_priority_tagged_snoozed(db):
+    alert = await _alert_with_snooze(db, NOW.date() + timedelta(days=1))
+    assert alert.priority == Priority.LOW
+    assert alert.labels == ["snoozed"]
+
+
+async def test_snoozed_repost_keeps_its_repost_tag(db):
+    alert = await _alert_with_snooze(db, NOW.date() + timedelta(days=1), posted_at=NOW,
+                                     created_at=NOW - timedelta(days=40))
+    assert alert.priority == Priority.LOW
+    assert "snoozed" in alert.labels and any(label.startswith("repost") for label in alert.labels)
+
+
+async def test_snooze_ends_on_its_date(db):
+    alert = await _alert_with_snooze(db, NOW.date())
+    assert alert.priority == Priority.HIGH
+    assert "snoozed" not in alert.labels
 
 
 async def test_failed_delivery_retries_next_cycle(db):

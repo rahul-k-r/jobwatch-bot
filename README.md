@@ -28,7 +28,7 @@ alerts for those are labelled `⚠ AI-directed instructions`.
 **Request rate:** every 5 min (±10%) from 6am to 9pm Pacific on weekdays, every 30 min otherwise
 (`offpeak` in `config.yaml`). When nothing is new, that's one request per site per cycle. At most
 `max_concurrent_sources` (10) poll at once, and a source can set `interval_seconds` to be polled
-less often. The client identifies itself honestly (`jobwatch/0.1`) instead of posing as a browser.
+less often. A source can also set `snooze_until: YYYY-MM-DD`: until that date its new postings still go through every filter but alert at low priority tagged `snoozed`, with no resume build. The client identifies itself honestly (`jobwatch/0.1`) instead of posing as a browser.
 
 ## Sources
 
@@ -40,10 +40,11 @@ less often. The client identifies itself honestly (`jobwatch/0.1`) instead of po
 | `ibm` | IBM careers search | IBM |
 | `google` | `feed.xml` (the results pages are disallowed by robots.txt) | Google, including DeepMind and YouTube |
 | `jibe` | Jibe careers sites (`/api/jobs`), honoring `crawl-delay` | AMD |
-| `workday` | Workday CXS | Adobe, Broadcom, Capital One, Cisco, CrowdStrike, HP, HPE, Intel, Mastercard, NVIDIA, Palo Alto Networks, PayPal, Red Hat, Salesforce, Visa, Workday |
-| `greenhouse` | Greenhouse job board API | Airbnb, Airtable, Anthropic, Arize AI, Boomi, Clarity AI, Coinbase, Databricks, Dialpad, Discord, DoorDash, Figma, Five Rings, Glean, Gong, Headlands Technologies, Hightouch, Hootsuite, Hudson River Trading, Hume AI, Intercom, Isomorphic Labs, Jane Street, Later, LivePerson, Make.com, Neuralink, Parloa, PDT Partners, PhysicsX, PlanetScale, PolyAI, Safari AI, Scandit, Speechmatics, Stability AI, Stripe, Tenstorrent, Twilio, Vercel, Waymo, Wayve, Weights & Biases (CoreWeave), xAI |
-| `ashby` | Ashby posting API | Attio, Bland AI, Causaly, Cerebras, Clay Labs, Clerk, Cohere, Cradle, Decagon, Deepgram, ElevenLabs, Etched, Faculty, Glacis AI, Inngest, Klue, Kraken, LangChain, Linear, Midjourney, Monad (Category Labs), n8n, Notion, OpenAI, Paradigm, Perk, Perplexity, Photoroom, Pinecone, Resend, RunPod, Runway, Sierra, Snowflake, Supabase, Synthesia, Temporal, The Browser Company, Vapi, WorkOS, Zapier, Zed Industries |
-| `lever` | Lever postings API | Palantir, Pigment, Tinybird, Zoox |
+| `workday` | Workday CXS | Adobe, Broadcom, Capital One, Cisco, CrowdStrike, eBay, Expedia, HP, HPE, Intel, Marvell, Mastercard, Micron, NVIDIA, Palo Alto Networks, PayPal, Red Hat, Salesforce, Snap, Visa, Workday, Zillow, Zoom |
+| `oracle` | Oracle Recruiting Cloud (`recruitingCEJobRequisitions`), US via the tenant's country facet | Dell, JPMorgan Chase, Oracle, Texas Instruments |
+| `greenhouse` | Greenhouse job board API | Affirm, Airbnb, Airtable, Akuna Capital, Anthropic, Arize AI, Asana, Block, Boomi, Box, Brex, Chime, Clarity AI, Cloudflare, Coinbase, Databricks, Datadog, Dialpad, Discord, DoorDash, Dropbox, Duolingo, Elastic, Figma, Figure AI, Five Rings, GitLab, Glean, Gong, Gusto, Headlands Technologies, Hightouch, Hootsuite, Hudson River Trading, Hume AI, IMC Trading, Instacart, Intercom, Isomorphic Labs, Jane Street, Jump Trading, Later, LivePerson, Lucid Motors, Lyft, Make.com, MongoDB, Neuralink, Okta, Parloa, PDT Partners, PhysicsX, Pinterest, PlanetScale, PolyAI, Reddit, Robinhood, Roblox, Safari AI, SambaNova, Samsara, Samsung Semiconductor, Scale AI, Scandit, SoFi, Speechmatics, Stability AI, Stripe, Tenstorrent, Toast, Together AI, Twilio, Vercel, Waymo, Wayve, Weights & Biases (CoreWeave), xAI |
+| `ashby` | Ashby posting API | Abridge, Anyscale, Attio, Baseten, Bland AI, Causaly, Cerebras, Character AI, Clay Labs, Clerk, Cognition, Cohere, Cradle, Crusoe, Cursor, Decagon, Deepgram, ElevenLabs, Etched, Faculty, Fireworks AI, Glacis AI, Harvey, Hebbia, Inngest, Klue, Kraken, Lambda, LangChain, Linear, Mercor, Midjourney, Modal, Monad (Category Labs), n8n, Notion, OpenAI, Paradigm, Perk, Perplexity, Photoroom, Physical Intelligence, Pinecone, Plaid, Ramp, Replit, Resend, RunPod, Runway, Safe Superintelligence, Sierra, Snowflake, Supabase, Synthesia, Temporal, The Browser Company, Thinking Machines Lab, Vapi, WorkOS, Writer, Zapier, Zed Industries |
+| `lever` | Lever postings API | Lyra Health, Palantir, Pigment, Tinybird, Zoox |
 | `workable` | Workable widget API | Hugging Face, Semios, Trail of Bits |
 
 ### Adding a source
@@ -70,11 +71,12 @@ cp .env.example .env                               # fill in what you use; every
 
 | Variable | Purpose |
 |---|---|
-| `GEMINI_API_KEY` | Classification. Without it, alerts go out unclassified. |
+| `GEMINI_API_KEY` | Classification. Without it (or the key below), alerts go out unclassified. |
+| `JOBWATCH_ANTHROPIC_API_KEY` | Optional. Claude (`claude_model`, default Haiku 5.5) classifies when both Gemini models fail; paid, so last in the chain and capped by `claude_daily_limit` (100 calls). |
 | `NTFY_TOPIC`, `NTFY_SERVER`, `NTFY_TOKEN` | Push delivery. Without a topic, alerts print to the console. |
 | `NTFY_TOPIC_RESUMES`, `NTFY_TOPIC_LOW` | Optional separate topics for handoff results ("Resume ready") and for low-priority alerts such as reposts. Each falls back to `NTFY_TOPIC`. |
 | `HEARTBEAT_URL` | Optional dead-man's switch (e.g. healthchecks.io), hit after every cycle. |
-| `HANDOFF_DIR` | Optional. Classified high-priority alerts are written to `inbox/` as JSON for another process; results it drops in `outbox/` are pushed as notifications. A `ready` result's `pdf` is attached to the push if it is a real PDF under 15 MB. |
+| `HANDOFF_DIR` | Optional. Classified high-priority alerts are written to `inbox/` as JSON for another process; results it drops in `outbox/` are pushed as notifications. A `ready` result's `pdf` is attached to the push if it is a real PDF under 15 MB. Greenhouse and Ashby postings also carry their free-text application questions; a result's `answers` become one "Copy answers" button (ntfy app; trailing answers are left out past ~6 KB). |
 | `JOBWATCH_DB` | SQLite path (default `jobwatch.db`). |
 
 **Alerts on Android:** install ntfy, subscribe to your topic, and turn on instant delivery. On the

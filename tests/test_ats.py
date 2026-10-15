@@ -1,5 +1,7 @@
 """Greenhouse, Ashby, Lever and Workable adapters (the company job-board platforms)."""
 
+import json
+
 import httpx
 import pytest
 import respx
@@ -41,6 +43,71 @@ async def test_greenhouse_list_is_light_and_detail_fills_offices():
     assert job.locations == ["San Francisco, California, United States"]
     assert "3+ years of experience in software engineering" in job.description
     assert "&lt;" not in job.description and "<" not in job.description
+
+
+@respx.mock
+async def test_greenhouse_detail_keeps_only_free_text_application_questions():
+    def q(label, *types, required=True):
+        return {"label": label, "required": required, "fields": [{"type": t} for t in types]}
+
+    detail = respx.get(f"{GH}/jobs/1").mock(return_value=httpx.Response(200, json={"content": "", "questions": [
+        q("First Name", "input_text"),
+        q("Resume/CV", "input_file", "textarea"),
+        q("Cover Letter", "input_file", "textarea", required=False),
+        q("Please provide 3-4 examples of exceptional ability.", "textarea"),
+        q("Second example:", "textarea", required=False),
+        q("Will you require sponsorship?", "multi_value_single_select"),
+    ]}))
+    job = Job(company="Neuralink", source_id="1", title="SWE", url="u")
+    async with httpx.AsyncClient() as client:
+        await GreenhouseSource("Neuralink", "anthropic").enrich(client, job)
+
+    assert detail.calls[0].request.url.params["questions"] == "true"  # same detail call, no extra request
+    assert job.questions == [
+        {"question": "Please provide 3-4 examples of exceptional ability.", "required": True},
+        {"question": "Second example:", "required": False},
+    ]
+
+
+ASHBY_GQL = "https://jobs.ashbyhq.com/api/non-user-graphql"
+
+
+@respx.mock
+async def test_ashby_enrich_reads_long_text_questions_from_the_application_form():
+    def entry(title, kind, required=True):
+        return {"isRequired": required, "field": {"title": title, "type": kind}}
+
+    route = respx.post(ASHBY_GQL).mock(return_value=httpx.Response(200, json={"data": {"jobPosting": {
+        "applicationForm": {"sections": [{"fieldEntries": [
+            entry("Name", "String"),
+            entry("Resume", "File"),
+            entry("How did you hear about us?", "ValueSelect"),
+            entry("What are your favourite AI tools?", "LongText"),
+            entry("Describe a project that went wrong.", "LongText", required=False),
+            {"descriptionHtml": "<p>section text, no field</p>"},
+        ]}]}}}}))
+    job = Job(company="ElevenLabs", source_id="abc-123", title="SWE", url="u", description="d")
+    async with httpx.AsyncClient() as client:
+        await AshbySource("ElevenLabs", "elevenlabs").enrich(client, job)
+
+    sent = json.loads(route.calls[0].request.content)
+    assert sent["variables"] == {"organizationHostedJobsPageName": "elevenlabs", "jobPostingId": "abc-123"}
+    assert job.questions == [
+        {"question": "What are your favourite AI tools?", "required": True},
+        {"question": "Describe a project that went wrong.", "required": False},
+    ]
+    assert job.description == "d"
+
+
+@respx.mock
+async def test_ashby_question_fetch_failure_is_not_fatal():
+    # Undocumented endpoint: if it changes, the posting still alerts and builds, just without questions.
+    respx.post(ASHBY_GQL).mock(side_effect=[httpx.Response(500), httpx.Response(200, json={"data": None})])
+    for _ in range(2):
+        job = Job(company="ElevenLabs", source_id="abc", title="SWE", url="u")
+        async with httpx.AsyncClient() as client:
+            await AshbySource("ElevenLabs", "elevenlabs").enrich(client, job)
+        assert job.questions == []
 
 
 @respx.mock

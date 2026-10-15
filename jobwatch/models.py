@@ -25,6 +25,8 @@ class Job:
     canaries: list[str] = field(default_factory=list)  # phrases those instructions try to plant in a CV
     # Last successful poll of this company before the one that found the job: the job appeared after it.
     prev_poll_at: datetime | None = None
+    # Free-text application-form questions ({"question", "required"}), for drafting answers with the CV.
+    questions: list[dict[str, Any]] = field(default_factory=list)
 
     @property
     def key(self) -> str:

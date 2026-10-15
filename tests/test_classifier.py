@@ -1,4 +1,6 @@
+import asyncio
 import json
+import time
 
 import httpx
 import pytest
@@ -52,8 +54,56 @@ async def test_transient_server_error_is_retried(db, cfg, monkeypatch):
 
 
 @respx.mock
+async def test_burst_batches_run_in_parallel_up_to_the_limit(db, cfg):
+    cfg.max_parallel_batches = 2
+    in_flight, peak = 0, 0
+
+    async def slow(request):
+        nonlocal in_flight, peak
+        in_flight += 1
+        peak = max(peak, in_flight)
+        await asyncio.sleep(0.05)
+        in_flight -= 1
+        n = len(json.loads(request.content)["contents"][0]["parts"][0]["text"].split("=== id:")) - 1
+        return gemini_reply([item(str(i)) for i in range(n)])
+
+    route = respx.post(URL).mock(side_effect=slow)
+    jobs = [make_job(source_id=str(i)) for i in range(6)]  # 3 batches of 2
+    async with httpx.AsyncClient() as client:
+        out = await GeminiClassifier(cfg, db, client).classify(jobs)
+    assert route.call_count == 3 and peak == 2
+    assert set(out) == {f"Acme:{i}" for i in range(6)}
+
+
+@respx.mock
+async def test_parallel_batches_still_respect_the_daily_budget(db, cfg):
+    cfg.max_parallel_batches, cfg.daily_limit = 3, 2
+    route = respx.post(URL).mock(return_value=gemini_reply([item("0"), item("1")]))
+    async with httpx.AsyncClient() as client:
+        await GeminiClassifier(cfg, db, client).classify([make_job(source_id=str(i)) for i in range(6)])
+    assert route.call_count == 2
+
+
+@respx.mock
+async def test_parallel_batch_starts_are_spaced_by_the_rate_limit(db, cfg):
+    cfg.max_parallel_batches, cfg.requests_per_minute = 3, 600  # one start per 0.1s
+    starts = []
+
+    def record(request):
+        starts.append(time.monotonic())
+        return gemini_reply([item("0"), item("1")])
+
+    respx.post(URL).mock(side_effect=record)
+    async with httpx.AsyncClient() as client:
+        await GeminiClassifier(cfg, db, client).classify([make_job(source_id=str(i)) for i in range(6)])
+    gaps = [b - a for a, b in zip(starts, starts[1:], strict=False)]
+    assert len(starts) == 3 and all(g >= 0.09 for g in gaps)  # queued for their slot, not all fired at once
+
+
+@respx.mock
 async def test_api_error_fails_open_and_stops_batching(db, cfg, monkeypatch):
     monkeypatch.setattr("jobwatch.classifier.RETRY_DELAYS", (0,))
+    cfg.max_parallel_batches = 1  # batches already in flight finish; ones not yet started are skipped
     route = respx.post(URL).mock(return_value=httpx.Response(400))
     jobs = [make_job(source_id=str(i)) for i in range(4)]
     async with httpx.AsyncClient() as client:
@@ -87,6 +137,61 @@ async def test_fallback_used_when_primary_budget_is_spent(db, cfg):
         out = await GeminiClassifier(cfg, db, client).classify([make_job(source_id="0")])
     assert primary.call_count == 0 and backup.call_count == 1
     assert "Acme:0" in out
+
+
+CLAUDE_URL = "https://api.anthropic.com/v1/messages"
+
+
+def claude_reply(items):
+    # Haiku 5.5 puts an (empty) thinking block before the answer.
+    return httpx.Response(200, json={"content": [
+        {"type": "thinking", "thinking": "", "signature": "x"},
+        {"type": "text", "text": json.dumps({"postings": items})},
+    ]})
+
+
+@respx.mock
+async def test_claude_is_the_last_resort_after_both_gemini_models(db, cfg, monkeypatch):
+    monkeypatch.setattr("jobwatch.classifier.RETRY_DELAYS", (0,))
+    cfg.fallback_model, cfg.fallback_requests_per_minute = "backup-model", 6000
+    cfg.claude_api_key, cfg.claude_requests_per_minute = "ck", 6000
+    respx.post(URL).mock(return_value=httpx.Response(503))
+    respx.post(FALLBACK_URL).mock(return_value=httpx.Response(500))
+    claude = respx.post(CLAUDE_URL).mock(return_value=claude_reply([item("0", level="entry")]))
+    async with httpx.AsyncClient() as client:
+        out = await GeminiClassifier(cfg, db, client).classify([make_job(source_id="0", description="desc")])
+
+    assert out["Acme:0"]["level"] == "entry"
+    req = claude.calls[0].request
+    assert req.headers["x-api-key"] == "ck" and req.headers["anthropic-version"] == "2023-06-01"
+    body = json.loads(req.content)
+    assert body["model"] == "claude-haiku-5-5"
+    # Structured output, not a forced tool call: Sonnet 5.5 rejects tool_choice "tool".
+    assert "tools" not in body and "tool_choice" not in body
+    schema = body["output_config"]["format"]["schema"]
+    items = schema["properties"]["postings"]["items"]
+    assert items["properties"]["min_years"]["type"] == ["integer", "null"]  # Gemini's nullable, in JSON Schema
+    assert items["properties"]["level"]["enum"][0] == "intern"
+    assert schema["additionalProperties"] is False and items["additionalProperties"] is False
+    assert "desc" in body["messages"][0]["content"]
+
+
+@respx.mock
+async def test_claude_alone_works_without_a_gemini_key(db, monkeypatch):
+    cfg = ClassifierConfig(api_key=None, claude_api_key="ck", claude_requests_per_minute=6000)
+    gemini = respx.post(url__startswith="https://generativelanguage.googleapis.com").mock(return_value=gemini_reply([]))
+    respx.post(CLAUDE_URL).mock(return_value=claude_reply([item("0")]))
+    async with httpx.AsyncClient() as client:
+        out = await GeminiClassifier(cfg, db, client).classify([make_job(source_id="0")])
+    assert gemini.call_count == 0 and "Acme:0" in out
+
+
+@respx.mock
+async def test_claude_reply_that_is_not_the_schema_is_unusable(db, monkeypatch):
+    cfg = ClassifierConfig(api_key=None, claude_api_key="ck", claude_requests_per_minute=6000)
+    respx.post(CLAUDE_URL).mock(return_value=httpx.Response(200, json={"content": [{"type": "text", "text": "no"}]}))
+    async with httpx.AsyncClient() as client:
+        assert await GeminiClassifier(cfg, db, client).classify([make_job(source_id="0")]) == {}
 
 
 @respx.mock

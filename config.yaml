@@ -65,14 +65,20 @@ repost:
   lookback_days: 90
 
 classifier:
-  enabled: true               # also needs GEMINI_API_KEY; without it, alerts are sent unclassified
-  model: gemini-flash-lite-latest
+  enabled: true               # also needs GEMINI_API_KEY or JOBWATCH_ANTHROPIC_API_KEY; without either, alerts are sent unclassified
+  # Pinned: the -latest alias moved to 3.5-flash-lite, which hung on every call (2026-10-13).
+  model: gemini-3.1-flash-lite
+  # Free tier per model (AI Studio, 2026-10-13): 15 RPM, 250K TPM, 500 RPD for 3.1 and 3.5 Flash Lite,
+  # counted separately. 13 RPM keeps a burst of ~15K-token batches under 250K TPM.
   daily_limit: 450            # below the free tier's 500/day for headroom
-  requests_per_minute: 10
-  fallback_model: gemma-4-26b-a4b-it   # separate free quota; ~25s/call, so only used when the primary fails
-  fallback_daily_limit: 10000
-  fallback_requests_per_minute: 10
+  requests_per_minute: 13
+  # The alias takes over once 3.1 is retired (404); it follows whatever flash-lite is current.
+  fallback_model: gemini-flash-lite-latest
+  fallback_daily_limit: 450
+  fallback_requests_per_minute: 13
+  timeout: 60                 # no Gemma in the chain any more; flash-lite answers a batch in seconds
   batch_size: 10
+  max_parallel_batches: 3     # a burst's batches run side by side; starts still respect requests_per_minute
 
 sources:
   - company: Microsoft
@@ -89,6 +95,7 @@ sources:
 
   - company: Amazon
     type: amazon
+    snooze_until: 2026-10-18   # alerts go to the low topic, tagged "snoozed", until this date
     params:
       'category[]': software-development
       country: USA
@@ -108,6 +115,7 @@ sources:
   # scientists under INFORMATION_TECHNOLOGY, so title rules decide instead. Includes DeepMind and YouTube.
   - company: Google
     type: google
+    snooze_until: 2026-11-09
     categories: []
 
   # Older Eightfold API: Netflix hasn't enabled PCSX. robots.txt allows /api/apply.
@@ -245,6 +253,70 @@ sources:
     site: crowdstrikecareers
     facets:
       locationCountry: [bc33aa3152ec42d4995f4791a106ed09]
+
+  # Added 2026-10-13 without facets; US is checked client-side.
+  - company: eBay
+    type: workday
+    host: ebay.wd5.myworkdayjobs.com
+    tenant: ebay
+    site: apply
+
+  - company: Expedia
+    type: workday
+    host: expedia.wd108.myworkdayjobs.com
+    tenant: expedia
+    site: search
+
+  - company: Zoom
+    type: workday
+    host: zoom.wd5.myworkdayjobs.com
+    tenant: zoom
+    site: Zoom
+
+  - company: Micron
+    type: workday
+    host: micron.wd1.myworkdayjobs.com
+    tenant: micron
+    site: External
+
+  - company: Marvell
+    type: workday
+    host: marvell.wd1.myworkdayjobs.com
+    tenant: marvell
+    site: MarvellCareers
+
+  - company: Zillow
+    type: workday
+    host: zillow.wd5.myworkdayjobs.com
+    tenant: zillow
+    site: Zillow_Group_External
+
+  - company: Snap
+    type: workday
+    host: snapchat.wd1.myworkdayjobs.com
+    tenant: snapchat
+    site: snap
+
+  # Oracle Recruiting Cloud. US only via the tenant's own country facet (looked up by name).
+  - company: JPMorgan Chase
+    type: oracle
+    host: jpmc.fa.oraclecloud.com
+    site: CX_1001
+
+  - company: Texas Instruments
+    type: oracle
+    host: edbz.fa.us2.oraclecloud.com
+    site: CX
+
+  - company: Oracle
+    type: oracle
+    host: eeho.fa.us2.oraclecloud.com
+    site: CX_45001
+
+  - company: Dell
+    type: oracle
+    host: enterpriseplatform.dell.com   # Dell's own domain in front of Oracle
+    site: careers
 
   # Jibe front end of AMD's iCIMS (the iCIMS portal itself is robots.txt Disallow: /).
   - company: AMD
@@ -388,3 +460,84 @@ sources:
   - {company: "Clerk", type: "ashby", board: "clerk"}
   - {company: "Inngest", type: "ashby", board: "inngest"}
   - {company: "PlanetScale", type: "greenhouse", board: "planetscale"}
+
+  # Added 2026-10-13: consumer and fintech.
+  - {company: "Lyft", type: "greenhouse", board: "lyft"}
+  - {company: "Dropbox", type: "greenhouse", board: "dropbox"}
+  - {company: "Pinterest", type: "greenhouse", board: "pinterest"}
+  - {company: "Reddit", type: "greenhouse", board: "reddit"}
+  - {company: "Instacart", type: "greenhouse", board: "instacart"}
+  - {company: "Robinhood", type: "greenhouse", board: "robinhood"}
+  - {company: "Block", type: "greenhouse", board: "block"}   # Square, Cash App, Afterpay, TIDAL
+  - {company: "Roblox", type: "greenhouse", board: "roblox"}
+  - {company: "Box", type: "greenhouse", board: "boxinc"}
+
+  # Added 2026-10-13: AI labs, AI infra and AI products. CoreWeave is already polled above via W&B.
+  - {company: "Together AI", type: "greenhouse", board: "togetherai"}
+  - {company: "SambaNova", type: "greenhouse", board: "sambanovasystems"}
+  - {company: "Figure AI", type: "greenhouse", board: "figureai"}
+  - {company: "Character AI", type: "ashby", board: "character"}
+  - {company: "Fireworks AI", type: "ashby", board: "fireworks"}
+  - {company: "Anyscale", type: "ashby", board: "anyscale"}
+  - {company: "Modal", type: "ashby", board: "modal"}
+  - {company: "Replit", type: "ashby", board: "replit"}
+  - {company: "Cursor (Anysphere)", type: "ashby", board: "cursor"}
+  - {company: "Harvey", type: "ashby", board: "harvey"}
+  - {company: "Hebbia", type: "ashby", board: "hebbia-ai"}
+  - {company: "Abridge", type: "ashby", board: "abridge"}
+  - {company: "Lambda", type: "ashby", board: "lambda"}
+  - {company: "Crusoe", type: "ashby", board: "crusoe"}
+  - {company: "Baseten", type: "ashby", board: "baseten"}
+  - {company: "Writer", type: "ashby", board: "writer"}
+  - {company: "Cognition", type: "ashby", board: "cognition"}
+  - {company: "Physical Intelligence", type: "ashby", board: "physicalintelligence"}
+  - {company: "Mercor", type: "ashby", board: "mercor"}
+  - {company: "Thinking Machines Lab", type: "ashby", board: "thinkingmachines"}
+  - {company: "Safe Superintelligence", type: "ashby", board: "ssi"}   # board empty for now
+
+  # Added 2026-10-13: infrastructure, dev tools and fintech.
+  - {company: "Datadog", type: "greenhouse", board: "datadog"}
+  - {company: "MongoDB", type: "greenhouse", board: "mongodb"}
+  - {company: "Cloudflare", type: "greenhouse", board: "cloudflare"}
+  - {company: "Okta", type: "greenhouse", board: "okta"}
+  - {company: "Elastic", type: "greenhouse", board: "elastic"}
+  - {company: "GitLab", type: "greenhouse", board: "gitlab"}
+  - {company: "Samsara", type: "greenhouse", board: "samsara"}
+  - {company: "Scale AI", type: "greenhouse", board: "scaleai"}
+  - {company: "Brex", type: "greenhouse", board: "brex"}
+  - {company: "Gusto", type: "greenhouse", board: "gusto"}
+  - {company: "Chime", type: "greenhouse", board: "chime"}
+  - {company: "Affirm", type: "greenhouse", board: "affirm"}
+  - {company: "SoFi", type: "greenhouse", board: "sofi"}
+  - {company: "Toast", type: "greenhouse", board: "toast"}
+  - {company: "Asana", type: "greenhouse", board: "asana"}
+  - {company: "Duolingo", type: "greenhouse", board: "duolingo"}
+  - {company: "Plaid", type: "ashby", board: "plaid"}
+  - {company: "Ramp", type: "ashby", board: "ramp"}
+  - {company: "Lyra Health", type: "lever", board: "lyrahealth"}
+
+  # Added 2026-10-13: trading firms and hardware.
+  - {company: "Jump Trading", type: "greenhouse", board: "jumptrading"}
+  - {company: "IMC Trading", type: "greenhouse", board: "imc"}
+  - {company: "Akuna Capital", type: "greenhouse", board: "akunacapital"}
+  - {company: "Lucid Motors", type: "greenhouse", board: "lucidmotors"}
+  - {company: "Samsung Semiconductor", type: "greenhouse", board: "samsungsemiconductor"}
+
+  # Added 2026-10-15: open-source / open-model companies.
+  - {company: "Nous Research", type: "ashby", board: "nousresearch"}
+  - {company: "Prime Intellect", type: "ashby", board: "primeintellect"}
+  - {company: "Reflection", type: "ashby", board: "reflectionai"}
+  - {company: "CrewAI", type: "workable", board: "crewai"}
+  - {company: "Prefect", type: "ashby", board: "prefect"}
+  - {company: "Ollama", type: "ashby", board: "ollama"}
+  - {company: "ClickHouse", type: "ashby", board: "clickhouse"}
+  - {company: "LanceDB", type: "ashby", board: "lancedb"}
+  - {company: "Inferact", type: "ashby", board: "inferact"}
+  - {company: "Mastra", type: "ashby", board: "mastra"}
+  - {company: "E2B", type: "ashby", board: "e2b"}
+  - {company: "Lightning AI", type: "greenhouse", board: "lightningai"}
+  - {company: "Kong", type: "ashby", board: "kong"}
+  - {company: "Browserbase", type: "ashby", board: "browserbase"}
+  - {company: "Zilliz", type: "lever", board: "zilliz"}
+  - {company: "Rasa", type: "ashby", board: "rasa"}
+  - {company: "Liquid AI", type: "ashby", board: "liquid-ai"}

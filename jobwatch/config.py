@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -45,6 +45,7 @@ class Config:
     title_rules: TitleRules
     company_rules: dict[str, TitleRules] = field(default_factory=dict)
     source_intervals: dict[str, int] = field(default_factory=dict)  # per-company minimum seconds between polls
+    snoozes: dict[str, date] = field(default_factory=dict)  # company -> first day its alerts are normal again
     poll_interval: int = 300
     offpeak: OffPeak | None = None
     max_pages: int = 5
@@ -71,6 +72,10 @@ class Config:
     def rules_for(self, company: str) -> TitleRules:
         return self.company_rules.get(company, self.title_rules)
 
+    def is_snoozed(self, company: str, now: datetime) -> bool:
+        until = self.snoozes.get(company)
+        return until is not None and now.date() < until
+
     def interval_at(self, now: datetime) -> int:
         if self.offpeak and not self.offpeak.is_busy(now):
             return self.offpeak.interval
@@ -82,7 +87,7 @@ def load_config(path: str | Path) -> Config:
     f = raw.get("filters", {})
     base = TitleRules.from_config(f.get("include_title", []), f.get("seniority_title", []), f.get("exclude_title", []))
 
-    sources, company_rules, source_intervals = [], {}, {}
+    sources, company_rules, source_intervals, snoozes = [], {}, {}, {}
     for spec in raw["sources"]:
         if spec.get("enabled", True) is False:
             continue
@@ -92,12 +97,17 @@ def load_config(path: str | Path) -> Config:
             company_rules[spec["company"]] = base.extend(extra)
         if interval := spec.get("interval_seconds"):
             source_intervals[spec["company"]] = interval
+        if until := spec.get("snooze_until"):
+            snoozes[spec["company"]] = until if isinstance(until, date) else date.fromisoformat(until)
 
     c = raw.get("classifier", {})
-    api_key = os.getenv("GEMINI_API_KEY")
+    api_key = os.getenv("GEMINI_API_KEY") or None
+    # Its own name: ANTHROPIC_API_KEY in a shell would move the resume worker's `claude -p` to API billing.
+    claude_key = os.getenv("JOBWATCH_ANTHROPIC_API_KEY") or None
     classifier = None
-    if c.get("enabled", True) and api_key:
-        classifier = ClassifierConfig(api_key=api_key, **{k: v for k, v in c.items() if k != "enabled"})
+    if c.get("enabled", True) and (api_key or claude_key):
+        classifier = ClassifierConfig(api_key=api_key, claude_api_key=claude_key,
+                                      **{k: v for k, v in c.items() if k != "enabled"})
 
     ntfy = None
     if topic := os.getenv("NTFY_TOPIC"):
@@ -119,6 +129,7 @@ def load_config(path: str | Path) -> Config:
         title_rules=base,
         company_rules=company_rules,
         source_intervals=source_intervals,
+        snoozes=snoozes,
         poll_interval=raw.get("poll_interval_seconds", 300),
         offpeak=offpeak,
         max_pages=raw.get("max_pages", 5),

@@ -12,6 +12,7 @@ from jobwatch.sources.greenhouse import GreenhouseSource
 from jobwatch.sources.ibm import IBMSource
 from jobwatch.sources.jibe import JibeSource
 from jobwatch.sources.lever import LeverSource
+from jobwatch.sources.oracle import OracleSource
 from jobwatch.sources.workable import WorkableSource
 from jobwatch.sources.workday import WorkdaySource
 
@@ -25,12 +26,13 @@ _TYPES: dict[str, type[Source]] = {
     "ibm": IBMSource,
     "jibe": JibeSource,
     "lever": LeverSource,
+    "oracle": OracleSource,
     "workable": WorkableSource,
     "workday": WorkdaySource,
 }
 
 # Keys of a `sources:` entry consumed by the pipeline rather than the adapter.
-PIPELINE_KEYS = ("type", "exclude_title", "interval_seconds")
+PIPELINE_KEYS = ("type", "exclude_title", "interval_seconds", "snooze_until")
 
 
 def build_source(spec: dict[str, Any]) -> Source:

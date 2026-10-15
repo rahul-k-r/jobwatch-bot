@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import random
 import re
@@ -8,6 +9,7 @@ import time
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from urllib.parse import urlencode
 
 import httpx
 
@@ -220,16 +222,26 @@ class Watcher:
         for path, r in self.handoff.collect():
             name = f"{r.get('company')} - {r.get('title')}"
             attachment = None
+            copy = None
             if r.get("status") == "ready":
                 warnings = "".join(f"\n⚠ {w}" for w in r.get("warnings") or [])
                 attachment = _read_pdf(r.get("pdf"))
                 note = "" if attachment else "\n(PDF not attached: file missing or not a PDF)"
                 title, message, priority = f"Resume ready: {name}", f"{_job_pdf(r.get('pdf'))}{warnings}{note}", Priority.HIGH
+                answers = [a for a in r.get("answers") or []
+                           if isinstance(a, dict) and isinstance(a.get("question"), str) and isinstance(a.get("answer"), str)]
+                if answers:
+                    text, dropped = answers_copy(answers)
+                    n = len(answers) - dropped
+                    message += f"\n✍ {n} application answer{'s' if n != 1 else ''} drafted. Review before pasting."
+                    if dropped:
+                        message += f" {dropped} more didn't fit the button; see answers.json beside the CV."
+                    copy = ("Copy answers", text) if n else None
             else:
                 title, message, priority = f"Resume not built: {name}", _strip_paths(str(r.get("reason"))), Priority.DEFAULT
             try:
                 await self.notifier.send_text(title, message, priority, click=r.get("url"), attachment=attachment,
-                                              channel="resumes")
+                                              channel="resumes", copy=copy)
             except Exception as e:
                 log.error("could not send %r, will retry: %r", title, e)
                 continue
@@ -238,6 +250,9 @@ class Watcher:
     def _alert(self, job: Job) -> Alert:
         c = job.classification or {}
         labels = []
+        snoozed = self.cfg.is_snoozed(job.company, self.clock())
+        if snoozed:
+            labels.append("snoozed")
         if c.get("min_years") is not None:
             labels.append(f"{c['min_years']}+ yrs")
         if c.get("unclassified"):
@@ -248,7 +263,7 @@ class Watcher:
             labels.append("⚠ AI-directed instructions")
         if job.ai_policy:
             labels.append("⚠ rejects AI-written applications")
-        return Alert(job, Priority.LOW if job.repost_reason else Priority.HIGH, labels)
+        return Alert(job, Priority.LOW if snoozed or job.repost_reason else Priority.HIGH, labels)
 
     async def _notice(self, title: str, message: str) -> None:
         try:
@@ -286,6 +301,21 @@ def _read_pdf(pdf: str | None) -> tuple[str, bytes] | None:
         return None
     # Every build is cv.pdf; name the download after its job folder so they're distinguishable on the phone.
     return f"{path.parent.name or 'resume'}.pdf", data
+
+
+# With a PDF the button travels in the upload's URL; ntfy.sh answered 414 at ~12KB, 6KB went through.
+MAX_COPY_ENCODED = 6000
+
+
+def answers_copy(answers: list[dict[str, str]]) -> tuple[str, int]:
+    """All Q/A pairs as one clipboard text, plus how many trailing pairs were left out to fit."""
+    pairs = [f"Q: {a['question'].strip()}\nA: {a['answer'].strip()}" for a in answers]
+    for n in range(len(pairs), 0, -1):
+        text = "\n\n".join(pairs[:n])
+        action = json.dumps([{"action": "copy", "label": "Copy answers", "value": text}])
+        if len(urlencode({"actions": action})) <= MAX_COPY_ENCODED:
+            return text, len(pairs) - n
+    return "", len(pairs)
 
 
 def _strip_paths(text: str) -> str:

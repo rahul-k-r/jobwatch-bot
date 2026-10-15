@@ -30,12 +30,14 @@ class GreenhouseSource(Source):
             yield [self._to_job(j) for j in data["jobs"]]
 
     async def enrich(self, client: httpx.AsyncClient, job: Job) -> None:
-        d = await request_json(client, "GET", f"{self.api}/jobs/{job.source_id}")
+        d = await request_json(client, "GET", f"{self.api}/jobs/{job.source_id}", params={"questions": "true"})
         # `content` is HTML that is itself entity-escaped.
         job.description = html_to_text(html.unescape(d.get("content") or ""))
         offices = [o.get("location") or o.get("name") for o in d.get("offices") or []]
         name = (d.get("location") or {}).get("name")
         job.locations = [o for o in offices if o] or ([name] if name else [])
+        job.questions = [{"question": q["label"].strip(), "required": bool(q.get("required"))}
+                         for q in d.get("questions") or [] if _free_text(q)]
 
     def _to_job(self, j: dict[str, Any]) -> Job:
         published = j.get("first_published") or j.get("updated_at")
@@ -51,3 +53,9 @@ class GreenhouseSource(Source):
             locations=[],
             posted_at=datetime.fromisoformat(published) if published else None,
         )
+
+
+def _free_text(q: dict[str, Any]) -> bool:
+    # Resume and cover letter are file-or-textarea pairs; only a lone textarea is a written answer.
+    types = {f.get("type") for f in q.get("fields") or []}
+    return types == {"textarea"} and bool((q.get("label") or "").strip())

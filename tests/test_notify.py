@@ -85,6 +85,21 @@ async def test_resume_ready_uploads_the_pdf_as_an_attachment():
 
 
 @respx.mock
+async def test_copy_button_goes_with_the_pdf_upload_and_the_text_fallback():
+    copy = ("Copy answers", "Q: Why us?\nA: Because – reasons.")
+    expected = [{"action": "copy", "label": "Copy answers", "value": "Q: Why us?\nA: Because – reasons."}]
+    upload = respx.put(f"{SERVER}/jobs").mock(side_effect=[httpx.Response(200), httpx.Response(413)])
+    text = respx.post(SERVER).mock(return_value=httpx.Response(200))
+    async with httpx.AsyncClient() as client:
+        n = NtfyNotifier(client, SERVER, "jobs")
+        await n.send_text("Resume ready", "a/cv.pdf", Priority.HIGH, attachment=("a.pdf", b"%PDF-1.5"), copy=copy)
+        await n.send_text("Resume ready", "a/cv.pdf", Priority.HIGH, attachment=("a.pdf", b"%PDF-1.5"), copy=copy)
+    assert json.loads(upload.calls[0].request.url.params["actions"]) == expected
+    [p] = payloads(text)  # the attachment was rejected; the answers still arrive
+    assert p["actions"] == expected
+
+
+@respx.mock
 async def test_rejected_attachment_falls_back_to_a_text_push():
     pdf = ("a.pdf", b"%PDF-1.5")
     respx.put(f"{SERVER}/jobs").mock(return_value=httpx.Response(413))

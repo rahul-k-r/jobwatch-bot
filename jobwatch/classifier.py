@@ -23,6 +23,7 @@ from jobwatch.models import Job
 log = logging.getLogger(__name__)
 
 _API = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+_CLAUDE_API = "https://api.anthropic.com/v1/messages"
 _PACIFIC = ZoneInfo("America/Los_Angeles")  # Gemini daily quotas reset at midnight Pacific
 _TRANSIENT = {429, 500, 502, 503, 504}
 RETRY_DELAYS = (5, 15)  # seconds before each retry of a transient failure
@@ -64,7 +65,7 @@ Return one object per posting, echoing its id.
 
 @dataclass
 class ClassifierConfig:
-    api_key: str
+    api_key: str | None  # Gemini; None leaves only Claude
     model: str = "gemini-flash-lite-latest"
     daily_limit: int = 450
     requests_per_minute: int = 10
@@ -73,13 +74,24 @@ class ClassifierConfig:
     fallback_daily_limit: int = 10000
     fallback_requests_per_minute: int = 10
     batch_size: int = 10
+    max_parallel_batches: int = 3
     max_chars: int = 5000
     timeout: float = 120  # Gemma needs far longer than the default 30s client timeout
+    # Paid, so last: only reached when both free Gemini models fail. ~10 postings per call.
+    claude_api_key: str | None = None
+    # Matched Sonnet 5.5 on every filtering field over 30 real postings, at ~1/15 the cost (2026-10-13).
+    claude_model: str = "claude-haiku-5-5"
+    claude_daily_limit: int = 100
+    claude_requests_per_minute: int = 10
 
     def chain(self) -> list[tuple[str, int, int]]:
-        models = [(self.model, self.daily_limit, self.requests_per_minute)]
-        if self.fallback_model:
-            models.append((self.fallback_model, self.fallback_daily_limit, self.fallback_requests_per_minute))
+        models = []
+        if self.api_key:
+            models.append((self.model, self.daily_limit, self.requests_per_minute))
+            if self.fallback_model:
+                models.append((self.fallback_model, self.fallback_daily_limit, self.fallback_requests_per_minute))
+        if self.claude_api_key:
+            models.append((self.claude_model, self.claude_daily_limit, self.claude_requests_per_minute))
         return models
 
 
@@ -87,17 +99,26 @@ class GeminiClassifier:
     def __init__(self, cfg: ClassifierConfig, db: DB, client: httpx.AsyncClient):
         self.cfg, self.db, self.client = cfg, db, client
         self._last_call: dict[str, float] = {}
+        self._budget_locks: dict[str, asyncio.Lock] = {}
 
     async def classify(self, jobs: list[Job]) -> dict[str, dict[str, Any]]:
-        """Returns {job.key: classification} for the jobs it managed to classify."""
-        out: dict[str, dict[str, Any]] = {}
-        for i in range(0, len(jobs), self.cfg.batch_size):
-            batch = jobs[i : i + self.cfg.batch_size]
-            result = await self._classify_batch(batch)
-            if result is None:
-                break  # quota or API trouble: don't burn more calls this cycle
-            out.update(result)
-        return out
+        """Returns {job.key: classification} for the jobs it managed to classify. A burst's batches run
+        side by side; their starts are still spaced by each model's rate limit."""
+        slots = asyncio.Semaphore(self.cfg.max_parallel_batches)
+        failed = False
+
+        async def run(batch: list[Job]) -> dict[str, dict[str, Any]]:
+            nonlocal failed
+            async with slots:
+                if failed:
+                    return {}  # quota or API trouble: don't burn more calls this cycle
+                result = await self._classify_batch(batch)
+                failed = failed or result is None
+                return result or {}
+
+        size = self.cfg.batch_size
+        results = await asyncio.gather(*(run(jobs[i : i + size]) for i in range(0, len(jobs), size)))
+        return {k: v for r in results for k, v in r.items()}
 
     async def _classify_batch(self, batch: list[Job]) -> dict[str, dict[str, Any]] | None:
         ids = {str(n): job for n, job in enumerate(batch)}
@@ -122,6 +143,8 @@ class GeminiClassifier:
             if not await self._take_budget(model, daily_limit, rpm):
                 return None
             try:
+                if model == self.cfg.claude_model:
+                    return await self._call_claude(model, body)
                 resp = await self.client.post(_API.format(model=model), json=body, timeout=self.cfg.timeout,
                                               headers={"x-goog-api-key": self.cfg.api_key})
                 resp.raise_for_status()
@@ -141,18 +164,56 @@ class GeminiClassifier:
                 return None
         return None
 
+    async def _call_claude(self, model: str, body: dict[str, Any]) -> list[dict]:
+        """Same prompt as Gemini, with the same schema as structured output. (Not a forced tool call:
+        Sonnet 5.5 rejects tool_choice "tool".)"""
+        schema = {"type": "object", "properties": {"postings": _json_schema(_SCHEMA)}, "required": ["postings"],
+                  "additionalProperties": False}
+        resp = await self.client.post(_CLAUDE_API, timeout=self.cfg.timeout, headers={
+            "x-api-key": self.cfg.claude_api_key, "anthropic-version": "2023-06-01"}, json={
+            "model": model,
+            "max_tokens": 8192,
+            "messages": [{"role": "user", "content": body["contents"][0]["parts"][0]["text"]}],
+            "output_config": {"format": {"type": "json_schema", "schema": schema}},
+        })
+        resp.raise_for_status()
+        text = "".join(c.get("text", "") for c in resp.json()["content"] if c.get("type") == "text")
+        reply = json.loads(text) if text else None
+        items = reply.get("postings") if isinstance(reply, dict) else None
+        if not isinstance(items, list):
+            raise ValueError("no postings list in the reply")
+        return items
+
     async def _take_budget(self, model: str, daily_limit: int, rpm: int) -> bool:
         """Every HTTP attempt counts against that model's free-tier quota, retries included."""
-        key = f"{datetime.now(_PACIFIC).date().isoformat()}|{model}"
-        if self.db.llm_requests(key) >= daily_limit:
-            log.warning("%s daily budget (%d) used up", model, daily_limit)
-            return False
-        wait = self._last_call.get(model, 0.0) + 60 / rpm - time.monotonic()
-        if wait > 0:
-            await asyncio.sleep(wait)
-        self._last_call[model] = time.monotonic()
-        self.db.add_llm_request(key)
-        return True
+        # Held across the wait, so parallel batches take turns: each sees the previous start and the count.
+        async with self._budget_locks.setdefault(model, asyncio.Lock()):
+            key = f"{datetime.now(_PACIFIC).date().isoformat()}|{model}"
+            if self.db.llm_requests(key) >= daily_limit:
+                log.warning("%s daily budget (%d) used up", model, daily_limit)
+                return False
+            wait = self._last_call.get(model, 0.0) + 60 / rpm - time.monotonic()
+            if wait > 0:
+                await asyncio.sleep(wait)
+            self._last_call[model] = time.monotonic()
+            self.db.add_llm_request(key)
+            return True
+
+
+def _json_schema(s: dict[str, Any]) -> dict[str, Any]:
+    """Gemini's OpenAPI-style schema (upper-case types, `nullable`) as JSON Schema for Claude."""
+    out: dict[str, Any] = {"type": s["type"].lower()}
+    if s.get("nullable"):
+        out["type"] = [out["type"], "null"]
+    for k in ("enum", "required"):
+        if k in s:
+            out[k] = s[k]
+    if "items" in s:
+        out["items"] = _json_schema(s["items"])
+    if "properties" in s:
+        out["properties"] = {k: _json_schema(v) for k, v in s["properties"].items()}
+        out["additionalProperties"] = False  # required by structured output
+    return out
 
 
 _QUALS = re.compile(r"(required|basic|minimum)\s+qualifications|qualifications|requirements", re.I)

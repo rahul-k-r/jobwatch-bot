@@ -5,7 +5,7 @@ from jobwatch.config import load_config
 
 @pytest.fixture
 def clean_env(monkeypatch):
-    for var in ("GEMINI_API_KEY", "NTFY_TOPIC", "NTFY_TOPIC_RESUMES", "NTFY_TOPIC_LOW", "NTFY_SERVER", "NTFY_TOKEN",
+    for var in ("GEMINI_API_KEY", "JOBWATCH_ANTHROPIC_API_KEY", "NTFY_TOPIC", "NTFY_TOPIC_RESUMES", "NTFY_TOPIC_LOW", "NTFY_SERVER", "NTFY_TOKEN",
                 "HEARTBEAT_URL", "JOBWATCH_DB"):
         monkeypatch.delenv(var, raising=False)
     return monkeypatch
@@ -30,6 +30,19 @@ def test_company_rules_extend_the_base_rules(clean_env):
     assert amazon.reject_reason("Software Development Engineer II, AWS") is None
 
 
+def test_snooze_until_is_parsed_and_expires_on_its_date(clean_env, tmp_path):
+    from datetime import UTC, datetime
+
+    path = tmp_path / "c.yaml"
+    path.write_text(
+        "sources:\n  - {company: Acme, type: greenhouse, board: acme, snooze_until: 2026-11-09}\n"
+        "  - {company: Other, type: greenhouse, board: other}\n", encoding="utf-8")
+    cfg = load_config(path)
+    assert cfg.is_snoozed("Acme", datetime(2026, 11, 8, 23, 59, tzinfo=UTC))
+    assert not cfg.is_snoozed("Acme", datetime(2026, 11, 9, 0, 0, tzinfo=UTC))
+    assert not cfg.is_snoozed("Other", datetime(2026, 11, 8, tzinfo=UTC))
+
+
 @pytest.mark.parametrize("utc, expected", [
     ("2026-09-29T16:00:00+00:00", 300),   # Tue 09:00 PT
     ("2026-09-29T13:00:00+00:00", 300),   # Tue 06:00 PT (start is inclusive)
@@ -50,6 +63,16 @@ def test_env_enables_integrations(clean_env):
     assert cfg.classifier.api_key == "k" and cfg.classifier.batch_size == 10
     assert (cfg.ntfy.server, cfg.ntfy.topic, cfg.ntfy.token) == ("https://ntfy.sh", "t", "tk_x")
     assert (cfg.ntfy.resume_topic, cfg.ntfy.low_topic) == (None, None)
+    assert cfg.classifier.claude_api_key is None
+
+
+def test_anthropic_key_adds_claude_and_alone_enables_the_classifier(clean_env):
+    # Not ANTHROPIC_API_KEY: in a shell's environment that would switch the resume worker's
+    # `claude -p` from the subscription to paid API billing.
+    clean_env.setenv("JOBWATCH_ANTHROPIC_API_KEY", "ck")
+    cfg = load_config("config.yaml")
+    assert cfg.classifier.claude_api_key == "ck" and cfg.classifier.api_key is None
+    assert [m for m, _, _ in cfg.classifier.chain()] == ["claude-haiku-5-5"]
 
 
 def test_separate_topics_for_resumes_and_low_priority(clean_env):

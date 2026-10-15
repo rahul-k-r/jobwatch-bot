@@ -21,8 +21,9 @@ class Notifier(Protocol):
 
     async def send_text(self, title: str, message: str, priority: Priority = Priority.DEFAULT,
                         click: str | None = None, attachment: tuple[str, bytes] | None = None,
-                        channel: str | None = None) -> None:
-        """channel="resumes" for build results; None for operational notices."""
+                        channel: str | None = None, copy: tuple[str, str] | None = None) -> None:
+        """channel="resumes" for build results; None for operational notices. copy=(label, text) adds a
+        button that copies the text to the clipboard."""
 
 
 def _line(a: Alert) -> str:
@@ -38,7 +39,9 @@ class ConsoleNotifier:
 
     async def send_text(self, title: str, message: str, priority: Priority = Priority.DEFAULT,
                         click: str | None = None, attachment: tuple[str, bytes] | None = None,
-                        channel: str | None = None) -> None:
+                        channel: str | None = None, copy: tuple[str, str] | None = None) -> None:
+        if copy:
+            message = f"{message}\n--- {copy[0]} ---\n{copy[1]}"
         print(f"[NOTICE p{int(priority)}] {title}: {message}" + (f"\n    {click}" if click else ""), flush=True)
 
 
@@ -84,12 +87,13 @@ class NtfyNotifier:
 
     async def send_text(self, title: str, message: str, priority: Priority = Priority.DEFAULT,
                         click: str | None = None, attachment: tuple[str, bytes] | None = None,
-                        channel: str | None = None) -> None:
+                        channel: str | None = None, copy: tuple[str, str] | None = None) -> None:
         topic = self.resume_topic if channel == "resumes" else self.topic
         tags = ["page_facing_up"] if click else ["warning"]
+        actions = [{"action": "copy", "label": copy[0], "value": copy[1]}] if copy else None
         if attachment:
             try:
-                await self._publish(topic, title, message, priority, click, tags, attachment)
+                await self._publish(topic, title, message, priority, click, tags, attachment, actions)
                 return
             except httpx.HTTPStatusError as e:
                 # Size/quota rejections won't succeed on retry; still deliver the notice. 429 and 5xx
@@ -98,12 +102,15 @@ class NtfyNotifier:
                     raise
                 log.warning("ntfy rejected the attachment (%d); sending without it", e.response.status_code)
                 message = f"{message}\n(PDF not attached: ntfy returned {e.response.status_code})"
-        await self._publish(topic, title, message, priority, click, tags)
+        await self._publish(topic, title, message, priority, click, tags, actions=actions)
 
     async def _publish(self, topic: str, title: str, message: str, priority: Priority, click: str | None,
-                       tags: list[str], attachment: tuple[str, bytes] | None = None) -> None:
+                       tags: list[str], attachment: tuple[str, bytes] | None = None,
+                       actions: list[dict[str, str]] | None = None) -> None:
         payload = {"topic": topic, "title": title, "message": message or title, "priority": int(priority),
                    "tags": tags}
+        if actions:
+            payload["actions"] = actions
         if click:
             # Tap target alone is invisible once the notification is gone; the text copy keeps the
             # link usable from history and the web app.
