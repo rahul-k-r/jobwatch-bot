@@ -14,7 +14,7 @@ from urllib.parse import urlencode
 import httpx
 
 from jobwatch.classifier import GeminiClassifier, exclusion_reason
-from jobwatch.config import Config
+from jobwatch.config import Config, load_config
 from jobwatch.db import DB
 from jobwatch.filters import is_us, no_sponsorship_reason
 from jobwatch.handoff import Handoff
@@ -41,9 +41,12 @@ class Watcher:
         classifier: GeminiClassifier | None = None,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
         handoff: Handoff | None = None,
+        config_path: Path | None = None,
     ):
         self.cfg, self.db, self.notifier, self.classifier, self.clock = cfg, db, notifier, classifier, clock
         self.handoff = handoff
+        self.config_path = config_path
+        self._config_mtime = self._mtime()
         self.failures: dict[str, int] = {}
         self.retry_at: dict[str, datetime] = {}
         self.last_poll: dict[str, datetime] = {}
@@ -51,7 +54,51 @@ class Watcher:
         self.classifier_down = False  # one notice per outage, however many postings are waiting
         self.started = False
 
-    async def cycle(self, client: httpx.AsyncClient) -> None:
+    def _mtime(self) -> int | None:
+        try:
+            return self.config_path.stat().st_mtime_ns if self.config_path else None
+        except OSError:
+            return None
+
+    def reload_if_changed(self) -> set[str]:
+        """Swaps in config.yaml if it changed on disk. Returns the companies whose source was added or
+        rebuilt, so the caller can poll them now. A bad edit keeps the current config. Only called between
+        cycles, so nothing is mid-poll. Env-derived settings (ntfy, db, handoff) never change at runtime."""
+        mtime = self._mtime()
+        if mtime is None or mtime == self._config_mtime:
+            return set()
+        self._config_mtime = mtime  # recorded first: a broken file is reported once per save, not per check
+        try:
+            new = load_config(self.config_path)
+        except Exception as e:
+            log.error("config reload failed, keeping the current config: %r", e)
+            return set()
+        old = self.cfg
+        keep = {s.company: s for s in old.sources if old.source_specs.get(s.company) == new.source_specs.get(s.company)}
+        new.sources = [keep.get(s.company, s) for s in new.sources]
+        changed = {s.company for s in new.sources if s.company not in keep}
+        removed = set(old.source_specs) - set(new.source_specs)
+        for state in (self.failures, self.retry_at, self.last_poll):
+            for name in removed:
+                state.pop(name, None)
+        if self.classifier and new.classifier:
+            self.classifier.cfg = new.classifier
+        elif bool(self.classifier) != bool(new.classifier):
+            log.warning("classifier on/off is not hot-reloadable; restart to apply")
+        self.cfg = new
+        log.info("config reloaded: %d sources (%d added or changed, %d removed)", len(new.sources), len(changed),
+                 len(removed))
+        return changed
+
+    async def idle(self, client: httpx.AsyncClient, seconds: float, check_every: float = 2.0) -> None:
+        """Waits out the gap between cycles, applying config edits as they land and polling only what they touched."""
+        end = time.monotonic() + seconds
+        while (left := end - time.monotonic()) > 0:
+            await asyncio.sleep(min(left, check_every))
+            if changed := self.reload_if_changed():
+                await self.cycle(client, only=changed)
+
+    async def cycle(self, client: httpx.AsyncClient, only: set[str] | None = None) -> None:
         limit = asyncio.Semaphore(self.cfg.max_concurrent_sources)
         spread = 0 if self.started else self.cfg.startup_spread
         self.started = True
@@ -62,7 +109,7 @@ class Watcher:
             async with limit:
                 await self._poll_guarded(client, source)
 
-        await asyncio.gather(*(poll(s) for s in self.cfg.sources))
+        await asyncio.gather(*(poll(s) for s in self.cfg.sources if only is None or s.company in only))
         await self.process_pending()
 
     async def _poll_guarded(self, client: httpx.AsyncClient, source: Source) -> None:
@@ -322,7 +369,7 @@ def _strip_paths(text: str) -> str:
     return _ABS_PATH.sub(lambda m: re.split(r"[\\/]", m.group(0))[-1], text)
 
 
-async def run(cfg: Config, once: bool = False) -> None:
+async def run(cfg: Config, once: bool = False, config_path: Path | None = None) -> None:
     db = DB(cfg.db_path)
     async with httpx.AsyncClient(timeout=30, headers={"User-Agent": USER_AGENT}, follow_redirects=True) as client:
         notifier: Notifier = (
@@ -334,14 +381,14 @@ async def run(cfg: Config, once: bool = False) -> None:
         handoff = Handoff(cfg.handoff_dir) if cfg.handoff_dir else None
         log.info("watching %d sources; notifier=%s; classifier=%s; resume handoff=%s", len(cfg.sources),
                  type(notifier).__name__, cfg.classifier.model if cfg.classifier else "off", cfg.handoff_dir or "off")
-        watcher = Watcher(cfg, db, notifier, classifier, handoff=handoff)
+        watcher = Watcher(cfg, db, notifier, classifier, handoff=handoff, config_path=None if once else config_path)
         # "Resume ready" should arrive when the CV is built, not at the next poll minutes later.
         results = asyncio.create_task(_deliver_results_forever(watcher)) if handoff and not once else None
         try:
             while True:
                 started = time.monotonic()
                 await watcher.cycle(client)
-                if cfg.heartbeat_url:
+                if cfg.heartbeat_url:  # env-derived, so the original cfg is as good as the reloaded one
                     try:
                         await client.get(cfg.heartbeat_url)
                     except httpx.HTTPError as e:
@@ -350,9 +397,9 @@ async def run(cfg: Config, once: bool = False) -> None:
                     await watcher.deliver_handoff_results()
                     return
                 # Jitter so polls don't land on exact, bot-like intervals.
-                interval = cfg.interval_at(datetime.now(UTC))
+                interval = watcher.cfg.interval_at(datetime.now(UTC))
                 delay = interval - (time.monotonic() - started) + random.uniform(-0.1, 0.1) * interval
-                await asyncio.sleep(max(delay, 5))
+                await watcher.idle(client, max(delay, 5))
         finally:
             if results:
                 results.cancel()

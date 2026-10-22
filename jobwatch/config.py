@@ -12,7 +12,7 @@ import yaml
 from jobwatch.classifier import ClassifierConfig
 from jobwatch.filters import TitleRules
 from jobwatch.repost import RepostRules
-from jobwatch.sources import Source, build_source
+from jobwatch.sources import PIPELINE_KEYS, Source, build_source
 
 
 @dataclass
@@ -46,6 +46,8 @@ class Config:
     company_rules: dict[str, TitleRules] = field(default_factory=dict)
     source_intervals: dict[str, int] = field(default_factory=dict)  # per-company minimum seconds between polls
     snoozes: dict[str, date] = field(default_factory=dict)  # company -> first day its alerts are normal again
+    # Adapter-only spec per company (pipeline keys stripped); a reload reuses a source whose spec is unchanged.
+    source_specs: dict[str, dict[str, Any]] = field(default_factory=dict)
     poll_interval: int = 300
     offpeak: OffPeak | None = None
     max_pages: int = 5
@@ -87,12 +89,13 @@ def load_config(path: str | Path) -> Config:
     f = raw.get("filters", {})
     base = TitleRules.from_config(f.get("include_title", []), f.get("seniority_title", []), f.get("exclude_title", []))
 
-    sources, company_rules, source_intervals, snoozes = [], {}, {}, {}
+    sources, company_rules, source_intervals, snoozes, source_specs = [], {}, {}, {}, {}
     for spec in raw["sources"]:
         if spec.get("enabled", True) is False:
             continue
         spec = {k: v for k, v in spec.items() if k != "enabled"}
         sources.append(build_source(spec))
+        source_specs[spec["company"]] = {k: v for k, v in spec.items() if k == "type" or k not in PIPELINE_KEYS}
         if extra := spec.get("exclude_title"):
             company_rules[spec["company"]] = base.extend(extra)
         if interval := spec.get("interval_seconds"):
@@ -130,6 +133,7 @@ def load_config(path: str | Path) -> Config:
         company_rules=company_rules,
         source_intervals=source_intervals,
         snoozes=snoozes,
+        source_specs=source_specs,
         poll_interval=raw.get("poll_interval_seconds", 300),
         offpeak=offpeak,
         max_pages=raw.get("max_pages", 5),

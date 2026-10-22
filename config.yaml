@@ -95,7 +95,7 @@ sources:
 
   - company: Amazon
     type: amazon
-    snooze_until: 2026-10-18   # alerts go to the low topic, tagged "snoozed", until this date
+    snooze_until: 2026-11-18   # alerts go to the low topic, tagged "snoozed", until this date
     params:
       'category[]': software-development
       country: USA
@@ -373,7 +373,7 @@ sources:
   - {company: "Shield AI", type: "lever", board: "shieldai", enabled: false}
 
   - {company: "Anthropic", type: "greenhouse", board: "anthropic"}
-  - {company: "OpenAI", type: "ashby", board: "openai"}
+  - {company: "OpenAI", type: "ashby", board: "openai", snooze_until: 2027-04-06}
   - {company: "PolyAI", type: "greenhouse", board: "polyai"}
   - {company: "Parloa", type: "greenhouse", board: "parloa"}
   - {company: "Intercom", type: "greenhouse", board: "intercom"}

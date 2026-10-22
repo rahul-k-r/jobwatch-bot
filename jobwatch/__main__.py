@@ -1,6 +1,7 @@
 import argparse
 import asyncio
 import logging
+from pathlib import Path
 
 from dotenv import load_dotenv
 
@@ -17,7 +18,7 @@ def main() -> None:
     load_dotenv()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     logging.getLogger("httpx").setLevel(logging.WARNING)
-    asyncio.run(run(load_config(args.config), once=args.once))
+    asyncio.run(run(load_config(args.config), once=args.once, config_path=Path(args.config)))
 
 
 if __name__ == "__main__":

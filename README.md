@@ -12,10 +12,10 @@ All sources are plain HTTP/JSON: no browser, no login.
 poll source (newest first, stop at first page with nothing new)
   ├─ first run for a company → record everything as "seeded", alert on nothing
   ├─ title rules      senior / intern / recruiting / out-of-scope → filtered
-  ├─ detail fetch     description (+ locations for Workday)
+  ├─ detail fetch     description (+ locations for Workday, application questions for Greenhouse/Ashby)
   ├─ US + sponsorship "must be a U.S. citizen", "unable to sponsor", ITAR, clearance … → filtered
   ├─ repost signals   old requisition, reused req ID, near-identical text, "reposted" → low priority
-  ├─ Gemini (batched) role scope / level / required years / PhD / sponsorship; failure → held and retried, then alert as "unclassified"
+  ├─ LLM (batched)    role scope / level / required years / PhD / sponsorship; failure → held and retried, then alert as "unclassified"
   └─ ntfy push        marked notified only after delivery succeeds; otherwise retried next cycle
 ```
 
@@ -29,6 +29,10 @@ alerts for those are labelled `⚠ AI-directed instructions`.
 (`offpeak` in `config.yaml`). When nothing is new, that's one request per site per cycle. At most
 `max_concurrent_sources` (10) poll at once, and a source can set `interval_seconds` to be polled
 less often. A source can also set `snooze_until: YYYY-MM-DD`: until that date its new postings still go through every filter but alert at low priority tagged `snoozed`, with no resume build. The client identifies itself honestly (`jobwatch/0.1`) instead of posing as a browser.
+
+**Hot reload:** `config.yaml` is re-read within ~2 s of a save (no restart). Added or changed sources are polled
+immediately; everything else (filters, snoozes, intervals, classifier limits) applies from the next use. A file that
+fails to parse is logged and ignored. `.env` values and turning the classifier on or off still need a restart.
 
 ## Sources
 
@@ -54,6 +58,9 @@ less often. A source can also set `snooze_until: YYYY-MM-DD`: until that date it
 - **Workday:** take `host/tenant/site` from the `*.myworkdayjobs.com` URL. Facet keys and IDs differ
   per tenant; read them from the `facets` array of a list response, and check that `total` actually
   drops when you apply one (some tenants silently ignore unknown facets).
+- **Oracle Recruiting Cloud:** `host` and `site` come from the `…/hcmUI/CandidateExperience/en/sites/<site>`
+  URL the careers page lands on (the host can be the company's own domain, e.g. Dell). The US facet is
+  looked up by name; set `country` for another country.
 - **Company-specific seniority:** `exclude_title` on a source adds patterns for that company only
   (e.g. Microsoft `IC4+`, Amazon `III`, Netflix `L5+`).
 - Disable any source with `enabled: false`.
@@ -81,21 +88,26 @@ cp .env.example .env                               # fill in what you use; every
 
 **Alerts on Android:** install ntfy, subscribe to your topic, and turn on instant delivery. On the
 public server, use a long random topic name (it's effectively the password). Each alert opens the
-posting on tap and also carries the link as text and an "Open posting" button.
+posting on tap and also carries the link as text, plus a one-line summary of the role's stack and
+conditions.
 
 **Tuning:** filters, thresholds and polling live in `config.yaml`. `repost.created_gap_days` is a
 heuristic; check the `reason` column of the `jobs` table after a week and adjust.
 
 ## Classification
 
-Gemini (Flash-Lite, falling back to Gemma 4 26B on errors) reads each posting that passes the rules
-and returns whether it's hands-on engineering at all, the level, required years (using the
-Master's-degree path when several are listed), whether a PhD is strictly required, sponsorship
-restrictions and repost mentions. Out-of-scope roles, postings needing 4+ years, a PhD with no
-Master's alternative, or ruling out sponsorship are dropped. Usage is capped per day below the free
-tier.
+An LLM reads each posting that passes the rules and returns whether it's hands-on engineering at
+all, the level, required years (using the Master's-degree path when several are listed), whether a
+PhD is strictly required, sponsorship restrictions, repost mentions and a one-line highlight for the
+push. Out-of-scope roles, internships, postings needing 4+ years, a PhD with no Master's
+alternative, or ruling out sponsorship are dropped.
 
-If neither model can be reached, the posting stays pending and is retried each cycle for
+Models are tried in order: Gemini 3.1 Flash-Lite (pinned), then `gemini-flash-lite-latest` (takes
+over when 3.1 is retired), then Claude Haiku if `JOBWATCH_ANTHROPIC_API_KEY` is set. Postings go in
+batches of 10, up to `max_parallel_batches` (3) at once; each model's starts are spaced by its
+`requests_per_minute` and capped by a daily limit kept below the free tier.
+
+If no model can be reached, the posting stays pending and is retried each cycle for
 `classify_grace_seconds` (default 900); one "Classifier unreachable" push goes out per outage. After
 that it alerts as "unclassified", so an outage can delay a posting but never lose it.
 
