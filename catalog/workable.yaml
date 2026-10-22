@@ -1,0 +1,6 @@
+# `board` is the account slug from the apply.workable.com/<board> URL.
+sources:
+  - {company: "Trail of Bits", type: "workable", board: "trailofbits"}
+  - {company: "Semios", type: "workable", board: "semios"}
+  - {company: "Hugging Face", type: "workable", board: "huggingface"}
+  - {company: "CrewAI", type: "workable", board: "crewai"}

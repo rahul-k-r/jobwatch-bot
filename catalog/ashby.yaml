@@ -1,0 +1,99 @@
+# `board` is the slug from the jobs.ashbyhq.com/<board> URL.
+sources:
+  # AI labs and research
+  - {company: "OpenAI", type: "ashby", board: "openai"}
+  - {company: "Cohere", type: "ashby", board: "cohere"}
+  - {company: "Character AI", type: "ashby", board: "character"}
+  - {company: "Cognition", type: "ashby", board: "cognition"}
+  - {company: "Physical Intelligence", type: "ashby", board: "physicalintelligence"}
+  - {company: "Thinking Machines Lab", type: "ashby", board: "thinkingmachines"}
+  - {company: "Safe Superintelligence", type: "ashby", board: "ssi"}   # board empty for now
+  - {company: "Nous Research", type: "ashby", board: "nousresearch"}
+  - {company: "Prime Intellect", type: "ashby", board: "primeintellect"}
+  - {company: "Reflection", type: "ashby", board: "reflectionai"}
+  - {company: "Liquid AI", type: "ashby", board: "liquid-ai"}
+  - {company: "Inferact", type: "ashby", board: "inferact"}
+  - {company: "Midjourney", type: "ashby", board: "midjourney"}
+  - {company: "Runway", type: "ashby", board: "runway-ml"}   # moved from Greenhouse; ashby "runway" is a different company
+  - {company: "Perplexity", type: "ashby", board: "perplexity"}
+
+  # AI infrastructure and chips
+  - {company: "Etched", type: "ashby", board: "etched"}
+  - {company: "Cerebras", type: "ashby", board: "cerebras"}
+  - {company: "Fireworks AI", type: "ashby", board: "fireworks"}
+  - {company: "Anyscale", type: "ashby", board: "anyscale"}
+  - {company: "Modal", type: "ashby", board: "modal"}
+  - {company: "Lambda", type: "ashby", board: "lambda"}
+  - {company: "Crusoe", type: "ashby", board: "crusoe"}
+  - {company: "Baseten", type: "ashby", board: "baseten"}
+  - {company: "RunPod", type: "ashby", board: "runpod"}   # moved from Greenhouse
+  - {company: "Ollama", type: "ashby", board: "ollama"}
+  - {company: "Pinecone", type: "ashby", board: "pinecone"}
+  - {company: "LanceDB", type: "ashby", board: "lancedb"}
+  - {company: "E2B", type: "ashby", board: "e2b"}
+  - {company: "Browserbase", type: "ashby", board: "browserbase"}
+
+  # AI products and agents
+  - {company: "Cursor (Anysphere)", type: "ashby", board: "cursor"}
+  - {company: "Replit", type: "ashby", board: "replit"}
+  - {company: "Harvey", type: "ashby", board: "harvey"}
+  - {company: "Hebbia", type: "ashby", board: "hebbia-ai"}
+  - {company: "Abridge", type: "ashby", board: "abridge"}
+  - {company: "Writer", type: "ashby", board: "writer"}
+  - {company: "Mercor", type: "ashby", board: "mercor"}
+  - {company: "Sierra", type: "ashby", board: "sierra"}
+  - {company: "Decagon", type: "ashby", board: "decagon"}
+  - {company: "LangChain", type: "ashby", board: "langchain"}
+  - {company: "Mastra", type: "ashby", board: "mastra"}
+  - {company: "Rasa", type: "ashby", board: "rasa"}
+  - {company: "Clay Labs", type: "ashby", board: "claylabs"}
+  - {company: "Glacis AI", type: "ashby", board: "glacis-ai"}
+  - {company: "Synthesia", type: "ashby", board: "synthesia"}
+  - {company: "Photoroom", type: "ashby", board: "photoroom"}
+  - {company: "Faculty", type: "ashby", board: "faculty"}
+  - {company: "Causaly", type: "ashby", board: "causaly"}
+  - {company: "Cradle", type: "ashby", board: "cradlebio"}
+
+  # Voice AI
+  - {company: "ElevenLabs", type: "ashby", board: "elevenlabs"}
+  - {company: "Deepgram", type: "ashby", board: "deepgram"}
+  - {company: "Vapi", type: "ashby", board: "vapi"}
+  - {company: "Bland AI", type: "ashby", board: "bland"}
+
+  # Developer tools, data and infrastructure
+  - {company: "Linear", type: "ashby", board: "linear"}
+  - {company: "Notion", type: "ashby", board: "notion"}
+  - {company: "Snowflake", type: "ashby", board: "snowflake"}
+  - {company: "ClickHouse", type: "ashby", board: "clickhouse"}
+  - {company: "Temporal", type: "ashby", board: "temporal"}   # moved from Greenhouse
+  - {company: "Prefect", type: "ashby", board: "prefect"}
+  - {company: "Kong", type: "ashby", board: "kong"}
+  - {company: "WorkOS", type: "ashby", board: "workos"}
+  - {company: "Supabase", type: "ashby", board: "supabase"}
+  - {company: "Resend", type: "ashby", board: "resend"}
+  - {company: "Clerk", type: "ashby", board: "clerk"}
+  - {company: "Inngest", type: "ashby", board: "inngest"}
+  - {company: "The Browser Company", type: "ashby", board: "the browser company"}
+  - {company: "Zed Industries", type: "ashby", board: "zed"}
+  - {company: "n8n", type: "ashby", board: "n8n"}
+  - {company: "Zapier", type: "ashby", board: "zapier"}
+  - {company: "Attio", type: "ashby", board: "attio"}
+  - {company: "Klue", type: "ashby", board: "klue"}
+  - {company: "Perk (TravelPerk)", type: "ashby", board: "perk"}   # renamed from TravelPerk
+
+  # Fintech and crypto
+  - {company: "Plaid", type: "ashby", board: "plaid"}
+  - {company: "Ramp", type: "ashby", board: "ramp"}
+  - {company: "Kraken", type: "ashby", board: "kraken.com"}
+  - {company: "Monad (Category Labs)", type: "ashby", board: "category-labs"}
+  - {company: "Paradigm", type: "ashby", board: "paradigm"}
+
+  # EU-based
+  - {company: "Aleph Alpha", type: "ashby", board: "AlephAlpha"}
+  - {company: "DeepL", type: "ashby", board: "DeepL"}
+  - {company: "Lovable", type: "ashby", board: "lovable"}
+  - {company: "Legora", type: "ashby", board: "legora"}
+
+  # Dead boards, kept so they aren't re-added by mistake.
+  - {company: "Lindy", type: "ashby", board: "lindy", enabled: false}   # board gone (404); new platform not found
+  - {company: "Lakera", type: "ashby", board: "lakera.ai", enabled: false}   # board empty; new platform not found

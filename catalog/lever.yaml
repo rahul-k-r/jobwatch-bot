@@ -1,0 +1,17 @@
+# `board` is the slug from the jobs.lever.co/<board> URL.
+sources:
+  - {company: "Zoox", type: "lever", board: "zoox"}
+  - {company: "Shield AI", type: "lever", board: "shieldai"}   # ITAR / clearance on most roles
+  - {company: "Palantir", type: "lever", board: "palantir", interval_seconds: 900}   # ~6MB uncompressed per poll
+  - {company: "Tinybird", type: "lever", board: "tinybird"}   # moved from Ashby
+  - {company: "Pigment", type: "lever", board: "pigment"}
+  - {company: "Lyra Health", type: "lever", board: "lyrahealth"}
+  - {company: "Zilliz", type: "lever", board: "zilliz"}
+  # EU-based
+  - {company: "Qonto", type: "lever", board: "qonto"}
+  - {company: "Forto", type: "lever", board: "forto"}
+  - {company: "Spotify", type: "lever", board: "spotify"}
+  - {company: "Vinted", type: "lever", board: "vinted"}
+  # Dead boards, kept so they aren't re-added by mistake.
+  - {company: "Mistral AI", type: "lever", board: "mistral", enabled: false}   # board empty; new platform not found
+  - {company: "Sanctuary AI", type: "lever", board: "sanctuary", enabled: false}   # board gone (404); ashby "sanctuary" is a different company

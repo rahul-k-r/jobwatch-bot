@@ -1,0 +1,31 @@
+sources:
+  - company: Microsoft
+    type: eightfold
+    host: apply.careers.microsoft.com
+    domain: microsoft.com
+    params:
+      location: United States
+      filter_include_remote: 1
+      filter_career_discipline: Software Engineering
+      filter_profession: software engineering
+    exclude_title:
+      - '\bIC ?[4-9]\b'   # Microsoft level codes: IC4 = Senior
+
+  # Older Eightfold API: Netflix hasn't enabled PCSX. robots.txt allows /api/apply.
+  - company: Netflix
+    type: eightfold
+    api: v2
+    host: explore.jobs.netflix.net
+    domain: netflix.com
+    params:
+      location: United States
+    exclude_title:
+      - '\bL[5-9]\b'                                           # "Software Engineer (L5)"; L5 = Senior
+      - '\b(engineer|engineering|scientist|developer)\s+[5-9]\b'   # "Analytics Engineer 5"
+
+  - company: Qualcomm
+    type: eightfold
+    host: careers.qualcomm.com
+    domain: qualcomm.com
+    params:
+      location: United States

@@ -6,6 +6,14 @@ alert, at low priority).
 
 All sources are plain HTTP/JSON: no browser, no login.
 
+## Configuration
+
+| File | Holds | Who edits it |
+|---|---|---|
+| `catalog/*.yaml` | The companies and how to poll them, one file per adapter (`custom.yaml` for the single-company ones). Company-specific seniority patterns, poll intervals, and `enabled: false` for dead boards. | Shared: add companies, fix boards |
+| `config.yaml` | Your `profile` (who the classifier judges postings for), title filters, years/sponsorship rules, `companies:` (`disable`, `enable`, `snooze` by catalog name), polling and classifier settings. | You |
+| `.env` | Secrets and deployment settings (see `.env.example`). | You |
+
 ## How a posting flows
 
 ```
@@ -27,31 +35,36 @@ alerts for those are labelled `⚠ AI-directed instructions`.
 
 **Request rate:** every 5 min (±10%) from 6am to 9pm Pacific on weekdays, every 30 min otherwise
 (`offpeak` in `config.yaml`). When nothing is new, that's one request per site per cycle. At most
-`max_concurrent_sources` (10) poll at once, and a source can set `interval_seconds` to be polled
-less often. A source can also set `snooze_until: YYYY-MM-DD`: until that date its new postings still go through every filter but alert at low priority tagged `snoozed`, with no resume build. The client identifies itself honestly (`jobwatch/0.1`) instead of posing as a browser.
+`max_concurrent_sources` (10) poll at once, and a catalog entry can set `interval_seconds` to be
+polled less often. A company in `companies.snooze` (`Name: YYYY-MM-DD`) still goes through every
+filter until that date but alerts at low priority tagged `snoozed`, with no resume build. The client
+identifies itself honestly (`jobwatch/0.1`) instead of posing as a browser.
 
-**Hot reload:** `config.yaml` is re-read within ~2 s of a save (no restart). Added or changed sources are polled
+**Hot reload:** `config.yaml` and the catalog are re-read within ~2 s of a save (no restart). Added or changed sources are polled
 immediately; everything else (filters, snoozes, intervals, classifier limits) applies from the next use. A file that
 fails to parse is logged and ignored. `.env` values and turning the classifier on or off still need a restart.
 
 ## Sources
 
-| Adapter | API | Companies |
+The catalog has 226 companies (199 polled with this repo's `config.yaml`). Read `catalog/` for the list.
+
+| Adapter | API | Catalog file |
 |---|---|---|
-| `eightfold` | Eightfold PCSX, or the older `/api/apply/v2` with `api: v2` | Microsoft, Netflix, Qualcomm |
-| `amazon` | amazon.jobs search | Amazon |
-| `apple` | jobs.apple.com search | Apple |
-| `ibm` | IBM careers search | IBM |
-| `google` | `feed.xml` (the results pages are disallowed by robots.txt) | Google, including DeepMind and YouTube |
-| `jibe` | Jibe careers sites (`/api/jobs`), honoring `crawl-delay` | AMD |
-| `workday` | Workday CXS | Adobe, Broadcom, Capital One, Cisco, CrowdStrike, eBay, Expedia, HP, HPE, Intel, Marvell, Mastercard, Micron, NVIDIA, Palo Alto Networks, PayPal, Red Hat, Salesforce, Snap, Visa, Workday, Zillow, Zoom |
-| `oracle` | Oracle Recruiting Cloud (`recruitingCEJobRequisitions`), US via the tenant's country facet | Dell, JPMorgan Chase, Oracle, Texas Instruments |
-| `greenhouse` | Greenhouse job board API | Affirm, Airbnb, Airtable, Akuna Capital, Anthropic, Arize AI, Asana, Block, Boomi, Box, Brex, Chime, Clarity AI, Cloudflare, Coinbase, Databricks, Datadog, Dialpad, Discord, DoorDash, Dropbox, Duolingo, Elastic, Figma, Figure AI, Five Rings, GitLab, Glean, Gong, Gusto, Headlands Technologies, Hightouch, Hootsuite, Hudson River Trading, Hume AI, IMC Trading, Instacart, Intercom, Isomorphic Labs, Jane Street, Jump Trading, Later, LivePerson, Lucid Motors, Lyft, Make.com, MongoDB, Neuralink, Okta, Parloa, PDT Partners, PhysicsX, Pinterest, PlanetScale, PolyAI, Reddit, Robinhood, Roblox, Safari AI, SambaNova, Samsara, Samsung Semiconductor, Scale AI, Scandit, SoFi, Speechmatics, Stability AI, Stripe, Tenstorrent, Toast, Together AI, Twilio, Vercel, Waymo, Wayve, Weights & Biases (CoreWeave), xAI |
-| `ashby` | Ashby posting API | Abridge, Anyscale, Attio, Baseten, Bland AI, Causaly, Cerebras, Character AI, Clay Labs, Clerk, Cognition, Cohere, Cradle, Crusoe, Cursor, Decagon, Deepgram, ElevenLabs, Etched, Faculty, Fireworks AI, Glacis AI, Harvey, Hebbia, Inngest, Klue, Kraken, Lambda, LangChain, Linear, Mercor, Midjourney, Modal, Monad (Category Labs), n8n, Notion, OpenAI, Paradigm, Perk, Perplexity, Photoroom, Physical Intelligence, Pinecone, Plaid, Ramp, Replit, Resend, RunPod, Runway, Safe Superintelligence, Sierra, Snowflake, Supabase, Synthesia, Temporal, The Browser Company, Thinking Machines Lab, Vapi, WorkOS, Writer, Zapier, Zed Industries |
-| `lever` | Lever postings API | Lyra Health, Palantir, Pigment, Tinybird, Zoox |
-| `workable` | Workable widget API | Hugging Face, Semios, Trail of Bits |
+| `greenhouse` | Greenhouse job board API | `greenhouse.yaml` (92) |
+| `ashby` | Ashby posting API | `ashby.yaml` (82) |
+| `workday` | Workday CXS | `workday.yaml` (23) |
+| `lever` | Lever postings API | `lever.yaml` (13) |
+| `oracle` | Oracle Recruiting Cloud (`recruitingCEJobRequisitions`), US via the tenant's country facet | `oracle.yaml` (4) |
+| `workable` | Workable widget API | `workable.yaml` (4) |
+| `eightfold` | Eightfold PCSX, or the older `/api/apply/v2` with `api: v2` | `eightfold.yaml` (3) |
+| `amazon`, `apple`, `ibm` | Each company's own search API | `custom.yaml` |
+| `google` | `feed.xml` (the results pages are disallowed by robots.txt); includes DeepMind and YouTube | `custom.yaml` |
+| `jibe` | Jibe careers sites (`/api/jobs`), honoring `crawl-delay` (AMD) | `custom.yaml` |
 
 ### Adding a source
+
+Append an entry to the catalog file for its adapter. `company` must be unique across the catalog
+(it's part of every job key).
 
 - **Greenhouse / Ashby / Lever / Workable:** `board` is the slug from the public board URL,
   e.g. `{company: "Stripe", type: "greenhouse", board: "stripe"}`.
@@ -63,7 +76,8 @@ fails to parse is logged and ignored. `.env` values and turning the classifier o
   looked up by name; set `country` for another country.
 - **Company-specific seniority:** `exclude_title` on a source adds patterns for that company only
   (e.g. Microsoft `IC4+`, Amazon `III`, Netflix `L5+`).
-- Disable any source with `enabled: false`.
+- `enabled: false` in the catalog is for boards that are dead. To skip a working company for
+  yourself, list it under `companies.disable` in `config.yaml`.
 
 ## Setup
 
@@ -91,7 +105,7 @@ public server, use a long random topic name (it's effectively the password). Eac
 posting on tap and also carries the link as text, plus a one-line summary of the role's stack and
 conditions.
 
-**Tuning:** filters, thresholds and polling live in `config.yaml`. `repost.created_gap_days` is a
+**Tuning:** your profile, filters, thresholds and polling live in `config.yaml`. `repost.created_gap_days` is a
 heuristic; check the `reason` column of the `jobs` table after a week and adjust.
 
 ## Classification

@@ -48,10 +48,10 @@ _SCHEMA = {
     },
 }
 
-_PROMPT = """You classify job postings for a software engineer with a Master's degree and about 3 years of experience who needs US visa sponsorship.
+_PROMPT = """You classify job postings for {profile}.
 For each posting return:
 - level: intern | entry | mid | senior | staff_plus | unknown, judged from the title AND the requirements (internal level codes such as IC3 / L4 / SDE II count). intern means an internship, co-op or other fixed-term student role, even if the title misspells it; a full-time new grad / university graduate role is entry, not intern.
-- min_years: the minimum years of experience the REQUIRED/basic qualifications ask for (ignore preferred qualifications). Where several degree paths are listed (e.g. "Bachelor's + 4 years OR Master's + 2 years"), use the Master's-degree path. null if not stated.
+- min_years: the minimum years of experience the REQUIRED/basic qualifications ask for (ignore preferred qualifications). Where several degree paths are listed (e.g. "Bachelor's + 4 years OR Master's + 2 years"), use the path for the candidate's highest degree. null if not stated.
 - mentions_repost: true only if the text says this is a repost / re-posting or addresses people who previously applied.
 - sponsorship: not_available only if the text says sponsorship is not offered, US citizenship is required, or a security clearance is needed. Generic equal-opportunity language mentioning citizenship or immigration status is NOT a restriction.
 - phd_required: true only if the REQUIRED qualifications demand a PhD and do not accept a Master's degree or equivalent experience instead. "PhD preferred", "PhD or MS", or a PhD listed only under preferred qualifications is false.
@@ -66,6 +66,8 @@ Return one object per posting, echoing its id.
 @dataclass
 class ClassifierConfig:
     api_key: str | None  # Gemini; None leaves only Claude
+    # Who the postings are judged for (config.yaml `profile`); completes "You classify job postings for ...".
+    profile: str = "a software engineer"
     model: str = "gemini-flash-lite-latest"
     daily_limit: int = 450
     requests_per_minute: int = 10
@@ -122,7 +124,7 @@ class GeminiClassifier:
 
     async def _classify_batch(self, batch: list[Job]) -> dict[str, dict[str, Any]] | None:
         ids = {str(n): job for n, job in enumerate(batch)}
-        prompt = _PROMPT + "\n\n".join(
+        prompt = _PROMPT.replace("{profile}", self.cfg.profile.rstrip(".")) + "\n\n".join(
             f"=== id: {n}\nTitle: {job.title}\nText:\n{_excerpt(job.description or '', self.cfg.max_chars)}"
             for n, job in ids.items()
         )

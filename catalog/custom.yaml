@@ -1,0 +1,35 @@
+# Companies with an adapter of their own. Shared catalog: personal choices (disable, snooze) go in
+# config.yaml under `companies:`. `exclude_title` here is company-specific seniority, not taste.
+sources:
+  - company: Amazon
+    type: amazon
+    params:
+      'category[]': software-development
+      country: USA
+    exclude_title:
+      - '\bIII\b'   # SDE III = Senior at Amazon (but mid-level at Google, so company-specific)
+
+  - company: Apple
+    type: apple
+    teams: [teamsAndSubTeams-SFTWR, teamsAndSubTeams-MLAI]   # Software & Services, ML & AI
+
+  - company: IBM
+    type: ibm
+
+  # feed.xml only: Google's results pages are robots.txt-disallowed and its ToS make that binding.
+  # The feed is regenerated every ~20-25 min; polls in between are cheap 304s.
+  # categories: [] = all. Customer Engineers are under SALES_OPERATIONS and DeepMind research
+  # scientists under INFORMATION_TECHNOLOGY, so title rules decide instead. Includes DeepMind and YouTube.
+  - company: Google
+    type: google
+    categories: []
+
+  # Jibe front end of AMD's iCIMS (the iCIMS portal itself is robots.txt Disallow: /).
+  - company: AMD
+    type: jibe
+    host: careers.amd.com
+    params:
+      country: United States
+    exclude_title:
+      - '\b[SP]?MTS\b'                    # AMD ladder: Senior < MTS < SMTS < PMTS
+      - '\bmember of technical staff\b'

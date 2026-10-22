@@ -5,6 +5,7 @@ COPY pyproject.toml ./
 COPY jobwatch ./jobwatch
 RUN pip install --no-cache-dir .
 COPY config.yaml ./
+COPY catalog ./catalog
 
 ENV JOBWATCH_DB=/data/jobwatch.db PYTHONUNBUFFERED=1
 VOLUME /data

@@ -43,6 +43,17 @@ async def test_batches_and_maps_results_back_to_jobs(db, cfg):
 
 
 @respx.mock
+async def test_prompt_describes_the_configured_candidate(db, cfg):
+    cfg.profile = "a data engineer with a Bachelor's degree and 1 year of experience"
+    route = respx.post(URL).mock(return_value=gemini_reply([item("0")]))
+    async with httpx.AsyncClient() as client:
+        await GeminiClassifier(cfg, db, client).classify([make_job(source_id="0")])
+    text = json.loads(route.calls[0].request.content)["contents"][0]["parts"][0]["text"]
+    assert text.startswith("You classify job postings for a data engineer with a Bachelor's degree")
+    assert "{profile}" not in text
+
+
+@respx.mock
 async def test_transient_server_error_is_retried(db, cfg, monkeypatch):
     # Seen live: a 503 on the first batch left a whole cycle's alerts unclassified.
     monkeypatch.setattr("jobwatch.classifier.RETRY_DELAYS", (0,))

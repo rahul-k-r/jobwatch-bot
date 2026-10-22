@@ -54,11 +54,18 @@ class Watcher:
         self.classifier_down = False  # one notice per outage, however many postings are waiting
         self.started = False
 
-    def _mtime(self) -> int | None:
-        try:
-            return self.config_path.stat().st_mtime_ns if self.config_path else None
-        except OSError:
+    def _mtime(self) -> tuple[int, ...] | None:
+        """Modification times of config.yaml and the catalog it names; any change means reload."""
+        if not self.config_path:
             return None
+
+        def stamp(p: Path) -> int:
+            try:
+                return p.stat().st_mtime_ns
+            except OSError:
+                return -1
+
+        return tuple(stamp(p) for p in dict.fromkeys([self.config_path, *self.cfg.watched]))
 
     def reload_if_changed(self) -> set[str]:
         """Swaps in config.yaml if it changed on disk. Returns the companies whose source was added or
@@ -86,6 +93,7 @@ class Watcher:
         elif bool(self.classifier) != bool(new.classifier):
             log.warning("classifier on/off is not hot-reloadable; restart to apply")
         self.cfg = new
+        self._config_mtime = self._mtime()  # the new config may watch a different set of catalog files
         log.info("config reloaded: %d sources (%d added or changed, %d removed)", len(new.sources), len(changed),
                  len(removed))
         return changed

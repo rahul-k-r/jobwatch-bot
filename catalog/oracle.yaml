@@ -1,0 +1,22 @@
+# Oracle Recruiting Cloud. host/site come from the .../hcmUI/CandidateExperience/en/sites/<site> URL the
+# careers page lands on. US only via the tenant's own country facet (looked up by name; `country` to change).
+sources:
+  - company: JPMorgan Chase
+    type: oracle
+    host: jpmc.fa.oraclecloud.com
+    site: CX_1001
+
+  - company: Texas Instruments
+    type: oracle
+    host: edbz.fa.us2.oraclecloud.com
+    site: CX
+
+  - company: Oracle
+    type: oracle
+    host: eeho.fa.us2.oraclecloud.com
+    site: CX_45001
+
+  - company: Dell
+    type: oracle
+    host: enterpriseplatform.dell.com   # Dell's own domain in front of Oracle
+    site: careers

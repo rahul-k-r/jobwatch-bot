@@ -13,11 +13,73 @@ def clean_env(monkeypatch):
 
 def test_repo_config_loads_with_optional_integrations_off(clean_env):
     cfg = load_config("config.yaml")
-    names = [s.company for s in cfg.sources]
-    assert names[:4] == ["Microsoft", "Amazon", "Apple", "IBM"]
-    assert len(names) == len(set(names))  # company is part of every job key
+    names = {s.company for s in cfg.sources}
+    assert {"Microsoft", "Amazon", "Apple", "IBM", "Anthropic", "JPMorgan Chase"} <= names
     assert cfg.classifier is None
     assert cfg.ntfy is None
+
+
+def test_shared_catalog_holds_no_personal_choices(clean_env):
+    import glob
+
+    import yaml
+
+    entries = [s for f in glob.glob("catalog/*.yaml") for s in yaml.safe_load(open(f, encoding="utf-8"))["sources"]]
+    assert not [s["company"] for s in entries if "snooze_until" in s]
+    names = {s.company for s in load_config("config.yaml").sources}
+    assert "SpaceX" not in names and "Anthropic" in names  # SpaceX is in the catalog, off for this user
+
+
+def test_catalog_files_hold_one_adapter_each(clean_env):
+    import glob
+    from pathlib import Path
+
+    import yaml
+
+    # custom.yaml holds the single-company adapters (amazon, apple, ...); every other file is named for its adapter.
+    for f in map(Path, glob.glob("catalog/*.yaml")):
+        types = {s["type"] for s in yaml.safe_load(f.read_text(encoding="utf-8"))["sources"]}
+        assert f.stem == "custom" or types == {f.stem}, f
+
+
+CATALOG = """sources:
+  - {company: Acme, type: greenhouse, board: acme}
+  - {company: Beta, type: ashby, board: beta}
+  - {company: Gone, type: lever, board: gone, enabled: false}   # dead board
+"""
+
+
+def write(tmp_path, personal, catalog=CATALOG):
+    (tmp_path / "sources.yaml").write_text(catalog, encoding="utf-8")
+    path = tmp_path / "config.yaml"
+    path.write_text("catalog: sources.yaml\n" + personal, encoding="utf-8")
+    return path
+
+
+def test_personal_choices_apply_over_the_catalog(clean_env, tmp_path):
+    from datetime import UTC, datetime
+
+    cfg = load_config(write(tmp_path, "companies:\n  disable: [Beta]\n  enable: [Gone]\n"
+                                      "  snooze: {Acme: 2026-11-09}\n"))
+    assert [s.company for s in cfg.sources] == ["Acme", "Gone"]
+    assert cfg.is_snoozed("Acme", datetime(2026, 11, 8, tzinfo=UTC))
+    assert cfg.watched == [tmp_path / "config.yaml", tmp_path / "sources.yaml"]
+
+
+def test_catalog_alone_uses_its_own_enabled_flags(clean_env, tmp_path):
+    assert [s.company for s in load_config(write(tmp_path, "")).sources] == ["Acme", "Beta"]
+
+
+@pytest.mark.parametrize("personal", ["companies:\n  disable: [Acme Corp]\n", "companies:\n  snooze: {Bta: 2026-11-09}\n"])
+def test_a_misspelt_company_is_an_error_not_a_silent_no_op(clean_env, tmp_path, personal):
+    with pytest.raises(ValueError, match="not in the catalog"):
+        load_config(write(tmp_path, personal))
+
+
+def test_duplicate_company_is_an_error(clean_env, tmp_path):
+    # company is part of every job key, so two entries would share (and corrupt) one history.
+    with pytest.raises(ValueError, match="Acme"):
+        load_config(write(tmp_path, "", CATALOG + "  - {company: Acme, type: lever, board: other}\n"))
 
 
 def test_company_rules_extend_the_base_rules(clean_env):
@@ -30,17 +92,19 @@ def test_company_rules_extend_the_base_rules(clean_env):
     assert amazon.reject_reason("Software Development Engineer II, AWS") is None
 
 
-def test_snooze_until_is_parsed_and_expires_on_its_date(clean_env, tmp_path):
+def test_snooze_expires_on_its_date(clean_env, tmp_path):
     from datetime import UTC, datetime
 
-    path = tmp_path / "c.yaml"
-    path.write_text(
-        "sources:\n  - {company: Acme, type: greenhouse, board: acme, snooze_until: 2026-11-09}\n"
-        "  - {company: Other, type: greenhouse, board: other}\n", encoding="utf-8")
-    cfg = load_config(path)
+    cfg = load_config(write(tmp_path, "companies:\n  snooze: {Acme: 2026-11-09}\n"))
     assert cfg.is_snoozed("Acme", datetime(2026, 11, 8, 23, 59, tzinfo=UTC))
     assert not cfg.is_snoozed("Acme", datetime(2026, 11, 9, 0, 0, tzinfo=UTC))
-    assert not cfg.is_snoozed("Other", datetime(2026, 11, 8, tzinfo=UTC))
+    assert not cfg.is_snoozed("Beta", datetime(2026, 11, 8, tzinfo=UTC))
+
+
+def test_profile_reaches_the_classifier(clean_env, tmp_path):
+    clean_env.setenv("GEMINI_API_KEY", "k")
+    cfg = load_config(write(tmp_path, "profile: >\n  a data engineer with 1 year of experience\n"))
+    assert cfg.classifier.profile == "a data engineer with 1 year of experience"
 
 
 @pytest.mark.parametrize("utc, expected", [

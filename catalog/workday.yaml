@@ -1,0 +1,170 @@
+# Workday tenants: host/tenant/site come from the *.myworkdayjobs.com URL. Facet keys/IDs are
+# tenant-specific (found via each tenant's `facets` response); check `total` drops when adding one.
+# US ID bc33aa3152ec42d4995f4791a106ed09 is global; tenants without a country facet are
+# US-filtered client-side after the detail call.
+sources:
+  - company: NVIDIA
+    type: workday
+    host: nvidia.wd5.myworkdayjobs.com
+    tenant: nvidia
+    site: NVIDIAExternalCareerSite
+    facets:
+      locationHierarchy1: [2fcb99c455831013ea52fb338f2932d8]   # United States (tenant-specific ID)
+      jobFamilyGroup: [0c40f6bd1d8f10ae43ffaefd46dc7e78]        # Engineering
+
+  - company: Red Hat
+    type: workday
+    host: redhat.wd5.myworkdayjobs.com
+    tenant: redhat
+    site: jobs
+    facets:
+      a: [bc33aa3152ec42d4995f4791a106ed09]   # yes, the country facet key is literally "a"
+
+  - company: Salesforce
+    type: workday
+    host: salesforce.wd12.myworkdayjobs.com
+    tenant: salesforce
+    site: External_Career_Site
+    facets:
+      CF_-_REC_-_LRV_-_Job_Posting_Anchor_-_Country_from_Job_Posting_Location_Extended: [bc33aa3152ec42d4995f4791a106ed09]
+      jobFamilyGroup: [14fa3452ec7c1011f90d0002a2100000]   # Software Engineering
+
+  - company: Adobe
+    type: workday
+    host: adobe.wd5.myworkdayjobs.com
+    tenant: adobe
+    site: external_experienced
+    facets:
+      locationCountry: [bc33aa3152ec42d4995f4791a106ed09]
+
+  - company: Intel
+    type: workday
+    host: intel.wd1.myworkdayjobs.com
+    tenant: intel
+    site: External
+    facets:
+      jobFamilyGroup: [ace7a3d23b7e01a0544279031a0ec85c]   # Software Engineering
+
+  - company: Cisco
+    type: workday
+    host: cisco.wd5.myworkdayjobs.com
+    tenant: cisco
+    site: Cisco_Careers
+    facets:
+      jobFamilyGroup: [2101eee3ea96016aef42a674fc016429]   # Engineering
+
+  - company: Workday
+    type: workday
+    host: workday.wd5.myworkdayjobs.com
+    tenant: workday
+    site: Workday
+    facets:
+      Location_Country: [bc33aa3152ec42d4995f4791a106ed09]
+
+  - company: PayPal
+    type: workday
+    host: paypal.wd1.myworkdayjobs.com
+    tenant: paypal
+    site: jobs
+
+  - company: Capital One
+    type: workday
+    host: capitalone.wd12.myworkdayjobs.com
+    tenant: capitalone
+    site: Capital_One
+    facets:
+      jobFamilyGroup: [23c40d87cd84100035bd7d9296540000]   # Software Engineering
+
+  - company: Visa
+    type: workday
+    host: visa.wd5.myworkdayjobs.com
+    tenant: visa
+    site: Visa
+    facets:
+      locationCountry: [bc33aa3152ec42d4995f4791a106ed09]
+
+  - company: Mastercard
+    type: workday
+    host: mastercard.wd1.myworkdayjobs.com
+    tenant: mastercard
+    site: CorporateCareers
+
+  - company: HP
+    type: workday
+    host: hp.wd5.myworkdayjobs.com
+    tenant: hp
+    site: ExternalCareerSite
+    facets:
+      Location_Country: [bc33aa3152ec42d4995f4791a106ed09]
+
+  - company: HPE
+    type: workday
+    host: hpe.wd5.myworkdayjobs.com
+    tenant: hpe
+    site: Jobsathpe
+
+  - company: Broadcom
+    type: workday
+    host: broadcom.wd1.myworkdayjobs.com
+    tenant: broadcom
+    site: External_Career
+
+  - company: CrowdStrike
+    type: workday
+    host: crowdstrike.wd5.myworkdayjobs.com
+    tenant: crowdstrike
+    site: crowdstrikecareers
+    facets:
+      locationCountry: [bc33aa3152ec42d4995f4791a106ed09]
+
+  # No country facet; US is checked client-side. Sales Systems Engineering family left out (presales).
+  - company: Palo Alto Networks
+    type: workday
+    host: paloaltonetworks.wd5.myworkdayjobs.com
+    tenant: paloaltonetworks
+    site: panwexternalcareers
+    facets:
+      jobFamilyGroup: [5aa443c785ff10453be1a6f2a173386b, 75835bfe2c0110f0a140d1bf54c5d362]   # Engineering, Customer Engineering & Support
+
+  # Added 2026-10-13 without facets; US is checked client-side.
+  - company: eBay
+    type: workday
+    host: ebay.wd5.myworkdayjobs.com
+    tenant: ebay
+    site: apply
+
+  - company: Expedia
+    type: workday
+    host: expedia.wd108.myworkdayjobs.com
+    tenant: expedia
+    site: search
+
+  - company: Zoom
+    type: workday
+    host: zoom.wd5.myworkdayjobs.com
+    tenant: zoom
+    site: Zoom
+
+  - company: Micron
+    type: workday
+    host: micron.wd1.myworkdayjobs.com
+    tenant: micron
+    site: External
+
+  - company: Marvell
+    type: workday
+    host: marvell.wd1.myworkdayjobs.com
+    tenant: marvell
+    site: MarvellCareers
+
+  - company: Zillow
+    type: workday
+    host: zillow.wd5.myworkdayjobs.com
+    tenant: zillow
+    site: Zillow_Group_External
+
+  - company: Snap
+    type: workday
+    host: snapchat.wd1.myworkdayjobs.com
+    tenant: snapchat
+    site: snap

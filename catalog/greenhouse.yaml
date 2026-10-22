@@ -1,0 +1,114 @@
+# `board` is the slug from the job-boards.greenhouse.io/<board> URL.
+sources:
+  # Trading
+  - {company: "Hudson River Trading", type: "greenhouse", board: "wehrtyou"}
+  - {company: "Five Rings", type: "greenhouse", board: "fiveringsllc"}
+  - {company: "Headlands Technologies", type: "greenhouse", board: "headlandstechnologiesllc"}
+  - {company: "Jane Street", type: "greenhouse", board: "janestreet"}
+  - {company: "PDT Partners", type: "greenhouse", board: "pdtpartners"}
+  - {company: "Jump Trading", type: "greenhouse", board: "jumptrading"}
+  - {company: "IMC Trading", type: "greenhouse", board: "imc"}
+  - {company: "Akuna Capital", type: "greenhouse", board: "akunacapital"}
+
+  # AI labs and AI infrastructure
+  - {company: "Anthropic", type: "greenhouse", board: "anthropic"}
+  - {company: "xAI", type: "greenhouse", board: "xai"}
+  - {company: "Weights & Biases (CoreWeave)", type: "greenhouse", board: "coreweave"}
+  - {company: "Together AI", type: "greenhouse", board: "togetherai"}
+  - {company: "SambaNova", type: "greenhouse", board: "sambanovasystems"}
+  - {company: "Scale AI", type: "greenhouse", board: "scaleai"}
+  - {company: "Lightning AI", type: "greenhouse", board: "lightningai"}
+  - {company: "Isomorphic Labs", type: "greenhouse", board: "isomorphiclabs"}
+  - {company: "Stability AI", type: "greenhouse", board: "stabilityai"}
+  - {company: "Arize AI", type: "greenhouse", board: "arizeai"}
+  - {company: "Glean", type: "greenhouse", board: "gleanwork"}
+
+  # Voice, conversational and customer AI
+  - {company: "PolyAI", type: "greenhouse", board: "polyai"}
+  - {company: "Parloa", type: "greenhouse", board: "parloa"}
+  - {company: "Intercom", type: "greenhouse", board: "intercom"}
+  - {company: "Hume AI", type: "greenhouse", board: "humeai"}
+  - {company: "LivePerson", type: "greenhouse", board: "liveperson"}
+  - {company: "Twilio", type: "greenhouse", board: "twilio"}
+  - {company: "Dialpad", type: "greenhouse", board: "dialpad"}
+  - {company: "Gong", type: "greenhouse", board: "gongio"}
+  - {company: "Speechmatics", type: "greenhouse", board: "speechmatics"}
+
+  # Hardware, robotics, autonomy
+  - {company: "Neuralink", type: "greenhouse", board: "neuralink"}
+  - {company: "Tenstorrent", type: "greenhouse", board: "tenstorrent"}
+  - {company: "Waymo", type: "greenhouse", board: "waymo"}
+  - {company: "Wayve", type: "greenhouse", board: "wayve"}
+  - {company: "Figure AI", type: "greenhouse", board: "figureai"}
+  - {company: "Lucid Motors", type: "greenhouse", board: "lucidmotors"}
+  - {company: "Samsung Semiconductor", type: "greenhouse", board: "samsungsemiconductor"}
+  - {company: "PhysicsX", type: "greenhouse", board: "physicsx"}
+  - {company: "Scandit", type: "greenhouse", board: "scandit"}
+  # ITAR "U.S. person" or clearance on essentially every engineering role.
+  - {company: "SpaceX", type: "greenhouse", board: "spacex"}
+  - {company: "Anduril", type: "greenhouse", board: "andurilindustries"}
+
+  # Consumer and marketplaces
+  - {company: "Airbnb", type: "greenhouse", board: "airbnb"}
+  - {company: "DoorDash", type: "greenhouse", board: "doordashusa"}
+  - {company: "Discord", type: "greenhouse", board: "discord"}
+  - {company: "Lyft", type: "greenhouse", board: "lyft"}
+  - {company: "Pinterest", type: "greenhouse", board: "pinterest"}
+  - {company: "Reddit", type: "greenhouse", board: "reddit"}
+  - {company: "Instacart", type: "greenhouse", board: "instacart"}
+  - {company: "Roblox", type: "greenhouse", board: "roblox"}
+  - {company: "Duolingo", type: "greenhouse", board: "duolingo"}
+
+  # Fintech and crypto
+  - {company: "Stripe", type: "greenhouse", board: "stripe"}
+  - {company: "Coinbase", type: "greenhouse", board: "coinbase"}
+  - {company: "Robinhood", type: "greenhouse", board: "robinhood"}
+  - {company: "Block", type: "greenhouse", board: "block"}   # Square, Cash App, Afterpay, TIDAL
+  - {company: "Brex", type: "greenhouse", board: "brex"}
+  - {company: "Gusto", type: "greenhouse", board: "gusto"}
+  - {company: "Chime", type: "greenhouse", board: "chime"}
+  - {company: "Affirm", type: "greenhouse", board: "affirm"}
+  - {company: "SoFi", type: "greenhouse", board: "sofi"}
+  - {company: "Toast", type: "greenhouse", board: "toast"}
+
+  # Infrastructure, data and developer tools
+  - {company: "Databricks", type: "greenhouse", board: "databricks"}
+  - {company: "Datadog", type: "greenhouse", board: "datadog"}
+  - {company: "MongoDB", type: "greenhouse", board: "mongodb"}
+  - {company: "Cloudflare", type: "greenhouse", board: "cloudflare"}
+  - {company: "Okta", type: "greenhouse", board: "okta"}
+  - {company: "Elastic", type: "greenhouse", board: "elastic"}
+  - {company: "GitLab", type: "greenhouse", board: "gitlab"}
+  - {company: "Samsara", type: "greenhouse", board: "samsara"}
+  - {company: "Vercel", type: "greenhouse", board: "vercel"}
+  - {company: "PlanetScale", type: "greenhouse", board: "planetscale"}
+  - {company: "Hightouch", type: "greenhouse", board: "hightouch"}
+  - {company: "Boomi", type: "greenhouse", board: "boomilp"}
+  - {company: "Make.com (Celonis)", type: "greenhouse", board: "make"}
+
+  # Productivity and SaaS
+  - {company: "Figma", type: "greenhouse", board: "figma"}
+  - {company: "Airtable", type: "greenhouse", board: "airtable"}
+  - {company: "Asana", type: "greenhouse", board: "asana"}
+  - {company: "Dropbox", type: "greenhouse", board: "dropbox"}
+  - {company: "Box", type: "greenhouse", board: "boxinc"}
+  - {company: "Later", type: "greenhouse", board: "later"}
+  - {company: "Safari AI", type: "greenhouse", board: "safariai"}
+  - {company: "Hootsuite", type: "greenhouse", board: "hootsuite"}
+  - {company: "Clarity AI", type: "greenhouse", board: "clarityai"}   # moved from Lever; ashby "clarity" is a different company
+
+  # EU-based
+  - {company: "Black Forest Labs", type: "greenhouse", board: "blackforestlabs"}
+  - {company: "Helsing", type: "greenhouse", board: "helsing"}
+  - {company: "Celonis", type: "greenhouse", board: "celonis"}
+  - {company: "Contentful", type: "greenhouse", board: "contentful"}
+  - {company: "GetYourGuide", type: "greenhouse", board: "getyourguide"}
+  - {company: "HelloFresh", type: "greenhouse", board: "hellofresh"}
+  - {company: "N26", type: "greenhouse", board: "n26"}
+  - {company: "Trade Republic", type: "greenhouse", board: "traderepublicbank"}
+  - {company: "SumUp", type: "greenhouse", board: "sumup"}
+  - {company: "Amplemarket", type: "greenhouse", board: "amplemarket"}
+
+  # Dead boards, kept so they aren't re-added by mistake.
+  - {company: "Ada", type: "greenhouse", board: "ada", enabled: false}   # board gone (404); new platform not found
+  - {company: "Factorial", type: "greenhouse", board: "factorial", enabled: false}   # board gone (404); new platform not found

@@ -48,6 +48,7 @@ class Config:
     snoozes: dict[str, date] = field(default_factory=dict)  # company -> first day its alerts are normal again
     # Adapter-only spec per company (pipeline keys stripped); a reload reuses a source whose spec is unchanged.
     source_specs: dict[str, dict[str, Any]] = field(default_factory=dict)
+    watched: list[Path] = field(default_factory=list)  # files a hot reload watches: config, then the catalog
     poll_interval: int = 300
     offpeak: OffPeak | None = None
     max_pages: int = 5
@@ -84,16 +85,45 @@ class Config:
         return self.poll_interval
 
 
+def _read_yaml(path: Path) -> dict[str, Any]:
+    return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+
+
+def _source_specs(raw: dict[str, Any], config_path: Path) -> tuple[list[dict[str, Any]], list[Path]]:
+    """Companies from the shared catalog: `catalog:` names a directory of *.yaml files (or one file),
+    each with a `sources:` list."""
+    catalog = config_path.parent / raw.get("catalog", "catalog")
+    files = sorted(catalog.glob("*.yaml")) if catalog.is_dir() else [catalog]
+    specs = [s for f in files for s in _read_yaml(f).get("sources") or []]
+    names = [s["company"] for s in specs]
+    if dupes := sorted({n for n in names if names.count(n) > 1}):
+        # company is part of every job key, so two entries would share one history
+        raise ValueError(f"duplicate company in the catalog: {', '.join(dupes)}")
+    # The directory's own mtime changes when a file is added or removed.
+    return specs, [config_path, *([catalog] if catalog.is_dir() else []), *files]
+
+
 def load_config(path: str | Path) -> Config:
-    raw: dict[str, Any] = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+    path = Path(path)
+    raw = _read_yaml(path)
     f = raw.get("filters", {})
     base = TitleRules.from_config(f.get("include_title", []), f.get("seniority_title", []), f.get("exclude_title", []))
 
+    specs, watched = _source_specs(raw, path)
+    # Personal choices over the shared catalog.
+    mine = raw.get("companies") or {}
+    disable, enable, snooze = set(mine.get("disable") or []), set(mine.get("enable") or []), mine.get("snooze") or {}
+    if unknown := sorted((disable | enable | set(snooze)) - {s["company"] for s in specs}):
+        raise ValueError(f"companies not in the catalog: {', '.join(unknown)}")
+
     sources, company_rules, source_intervals, snoozes, source_specs = [], {}, {}, {}, {}
-    for spec in raw["sources"]:
-        if spec.get("enabled", True) is False:
+    for spec in specs:
+        name = spec["company"]
+        if name in disable or (spec.get("enabled", True) is False and name not in enable):
             continue
         spec = {k: v for k, v in spec.items() if k != "enabled"}
+        if name in snooze:
+            spec["snooze_until"] = snooze[name]
         sources.append(build_source(spec))
         source_specs[spec["company"]] = {k: v for k, v in spec.items() if k == "type" or k not in PIPELINE_KEYS}
         if extra := spec.get("exclude_title"):
@@ -109,7 +139,8 @@ def load_config(path: str | Path) -> Config:
     claude_key = os.getenv("JOBWATCH_ANTHROPIC_API_KEY") or None
     classifier = None
     if c.get("enabled", True) and (api_key or claude_key):
-        classifier = ClassifierConfig(api_key=api_key, claude_api_key=claude_key,
+        profile = {"profile": raw["profile"].strip()} if raw.get("profile") else {}
+        classifier = ClassifierConfig(api_key=api_key, claude_api_key=claude_key, **profile,
                                       **{k: v for k, v in c.items() if k != "enabled"})
 
     ntfy = None
@@ -134,6 +165,7 @@ def load_config(path: str | Path) -> Config:
         source_intervals=source_intervals,
         snoozes=snoozes,
         source_specs=source_specs,
+        watched=watched,
         poll_interval=raw.get("poll_interval_seconds", 300),
         offpeak=offpeak,
         max_pages=raw.get("max_pages", 5),
