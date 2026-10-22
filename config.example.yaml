@@ -1,9 +1,11 @@
-# Personal settings. Companies live in the shared catalog (catalog/*.yaml); secrets and deployment
-# settings in .env (see .env.example). Saved edits to this file or the catalog apply without a restart.
+# Copy to config.yaml (gitignored) and make it yours. Companies live in the shared catalog
+# (catalog/*.yaml); secrets and deployment settings in .env (see .env.example). Saved edits to
+# config.yaml or the catalog apply without a restart.
 
-# Who postings are judged for; completes "You classify job postings for ...".
+# Who postings are judged for; completes "You classify job postings for ...". Degree and years matter:
+# the classifier reads required experience on the path that fits your degree.
 profile: >
-  a software engineer with a Master's degree and about 3 years of experience who needs US visa sponsorship
+  a software engineer with a Bachelor's degree and 2 years of experience who needs US visa sponsorship
 
 filters:
   us_only: true
@@ -16,7 +18,7 @@ filters:
     - '\b(sde|swe|sre)\b'
     - '\bdeveloper\b'
     - '\b(machine learning|ml|ai|deep learning|data|platform|infrastructure|back[- ]?end|front[- ]?end|full[- ]?stack|systems|cloud|devops|site reliability|reliability)\s+engineer'
-    # Customer-facing engineering (current field) and AI-specific titles; phrases, not bare "AI"/"Agent",
+    # Customer-facing engineering and AI-specific titles; phrases, not bare "AI"/"Agent",
     # so "AI Account Executive" or "Agent Support Specialist" don't match.
     - '\bforward[- ]deployed\b'
     - '\bdeployed engineer'
@@ -86,15 +88,14 @@ companies:
   # polled and its new postings pass every filter, but each alert goes to the low-priority topic tagged
   # "snoozed" and no resume is built. From the date on, alerts are normal again. Useful after applying
   # (a cooldown) or while a company isn't a priority. Works for every adapter, custom ones included:
+  #   Amazon: 2026-12-01               # custom (amazon)
+  #   Google: 2026-12-01               # custom (google)
   #   Microsoft: 2026-12-01            # eightfold
-  #   Apple: 2026-12-01                # custom (apple)
   #   NVIDIA: 2027-01-15               # workday
   #   JPMorgan Chase: 2027-01-15       # oracle
+  #   OpenAI: 2027-01-15               # ashby
   #   "Weights & Biases (CoreWeave)": 2026-12-01   # quote names with special characters
-  snooze:
-    Amazon: 2026-11-18    # custom (amazon)
-    Google: 2026-11-09    # custom (google)
-    OpenAI: 2027-04-06    # ashby
+  snooze: {}
 
 # Polling
 poll_interval_seconds: 300  # during busy hours; each site gets ~1 request per poll when nothing is new
@@ -123,6 +124,6 @@ classifier:
   fallback_model: gemini-flash-lite-latest
   fallback_daily_limit: 450
   fallback_requests_per_minute: 13
-  timeout: 60                 # no Gemma in the chain any more; flash-lite answers a batch in seconds
+  timeout: 60
   batch_size: 10
   max_parallel_batches: 3     # a burst's batches run side by side; starts still respect requests_per_minute

@@ -11,7 +11,7 @@ All sources are plain HTTP/JSON: no browser, no login.
 | File | Holds | Who edits it |
 |---|---|---|
 | `catalog/*.yaml` | The companies and how to poll them, one file per adapter (`custom.yaml` for the single-company ones). Company-specific seniority patterns, poll intervals, and `enabled: false` for dead boards. | Shared: add companies, fix boards |
-| `config.yaml` | Your `profile` (who the classifier judges postings for), title filters, years/sponsorship rules, `companies:` (`disable`, `enable`, `snooze` by catalog name), polling and classifier settings. | You |
+| `config.yaml` | Your `profile` (who the classifier judges postings for), title filters, years/sponsorship rules, `companies:` (`disable`, `enable`, `snooze` by catalog name), polling and classifier settings. Gitignored: start from `config.example.yaml`. | You |
 | `.env` | Secrets and deployment settings (see `.env.example`). | You |
 
 ## How a posting flows
@@ -46,7 +46,7 @@ fails to parse is logged and ignored. `.env` values and turning the classifier o
 
 ## Sources
 
-The catalog has 226 companies (199 polled with this repo's `config.yaml`). Read `catalog/` for the list.
+The catalog has 226 companies (199 polled with `config.example.yaml`). Read `catalog/` for the list.
 
 | Adapter | API | Catalog file |
 |---|---|---|
@@ -85,6 +85,7 @@ Append an entry to the catalog file for its adapter. `company` must be unique ac
 python -m venv .venv
 .venv/Scripts/python -m pip install -e ".[dev]"   # .venv/bin/python on Linux
 cp .env.example .env                               # fill in what you use; everything is optional
+cp config.example.yaml config.yaml                 # then set your profile, filters and companies
 .venv/Scripts/python -m pytest
 .venv/Scripts/python -m jobwatch --once            # one cycle; the first run seeds every company
 .venv/Scripts/python -m jobwatch                   # run forever

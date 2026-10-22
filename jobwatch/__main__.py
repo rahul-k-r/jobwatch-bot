@@ -15,6 +15,8 @@ def main() -> None:
     parser.add_argument("--once", action="store_true", help="run a single poll cycle and exit")
     args = parser.parse_args()
 
+    if not Path(args.config).exists():
+        parser.error(f"{args.config} not found: copy config.example.yaml to config.yaml and make it yours")
     load_dotenv()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     logging.getLogger("httpx").setLevel(logging.WARNING)

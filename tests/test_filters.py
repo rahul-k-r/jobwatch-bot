@@ -8,7 +8,7 @@ from jobwatch.sources.base import html_to_text
 
 @pytest.fixture(scope="module")
 def rules():
-    f = yaml.safe_load(open("config.yaml", encoding="utf-8"))["filters"]
+    f = yaml.safe_load(open("config.example.yaml", encoding="utf-8"))["filters"]
     return TitleRules.from_config(f["include_title"], f["seniority_title"], f["exclude_title"])
 
 

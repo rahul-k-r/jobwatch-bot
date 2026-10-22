@@ -12,7 +12,7 @@ def clean_env(monkeypatch):
 
 
 def test_repo_config_loads_with_optional_integrations_off(clean_env):
-    cfg = load_config("config.yaml")
+    cfg = load_config("config.example.yaml")
     names = {s.company for s in cfg.sources}
     assert {"Microsoft", "Amazon", "Apple", "IBM", "Anthropic", "JPMorgan Chase"} <= names
     assert cfg.classifier is None
@@ -26,8 +26,8 @@ def test_shared_catalog_holds_no_personal_choices(clean_env):
 
     entries = [s for f in glob.glob("catalog/*.yaml") for s in yaml.safe_load(open(f, encoding="utf-8"))["sources"]]
     assert not [s["company"] for s in entries if "snooze_until" in s]
-    names = {s.company for s in load_config("config.yaml").sources}
-    assert "SpaceX" not in names and "Anthropic" in names  # SpaceX is in the catalog, off for this user
+    names = {s.company for s in load_config("config.example.yaml").sources}
+    assert "SpaceX" not in names and "Anthropic" in names  # SpaceX is in the catalog, off in the example config
 
 
 def test_catalog_files_hold_one_adapter_each(clean_env):
@@ -83,11 +83,11 @@ def test_duplicate_company_is_an_error(clean_env, tmp_path):
 
 
 def test_company_rules_extend_the_base_rules(clean_env):
-    ms = load_config("config.yaml").rules_for("Microsoft")
+    ms = load_config("config.example.yaml").rules_for("Microsoft")
     assert ms.reject_reason("Software Engineering IC4") == "senior title"
     assert ms.reject_reason("Software Engineering IC3") is None
     assert ms.reject_reason("Senior Software Engineer") == "senior title"
-    amazon = load_config("config.yaml").rules_for("Amazon")
+    amazon = load_config("config.example.yaml").rules_for("Amazon")
     assert amazon.reject_reason("Software Development Engineer III, AWS") == "senior title"
     assert amazon.reject_reason("Software Development Engineer II, AWS") is None
 
@@ -116,14 +116,14 @@ def test_profile_reaches_the_classifier(clean_env, tmp_path):
 ])
 def test_offpeak_interval(clean_env, utc, expected):
     from datetime import datetime
-    assert load_config("config.yaml").interval_at(datetime.fromisoformat(utc)) == expected
+    assert load_config("config.example.yaml").interval_at(datetime.fromisoformat(utc)) == expected
 
 
 def test_env_enables_integrations(clean_env):
     clean_env.setenv("GEMINI_API_KEY", "k")
     clean_env.setenv("NTFY_TOPIC", "t")
     clean_env.setenv("NTFY_TOKEN", "tk_x")
-    cfg = load_config("config.yaml")
+    cfg = load_config("config.example.yaml")
     assert cfg.classifier.api_key == "k" and cfg.classifier.batch_size == 10
     assert (cfg.ntfy.server, cfg.ntfy.topic, cfg.ntfy.token) == ("https://ntfy.sh", "t", "tk_x")
     assert (cfg.ntfy.resume_topic, cfg.ntfy.low_topic) == (None, None)
@@ -134,7 +134,7 @@ def test_anthropic_key_adds_claude_and_alone_enables_the_classifier(clean_env):
     # Not ANTHROPIC_API_KEY: in a shell's environment that would switch the resume worker's
     # `claude -p` from the subscription to paid API billing.
     clean_env.setenv("JOBWATCH_ANTHROPIC_API_KEY", "ck")
-    cfg = load_config("config.yaml")
+    cfg = load_config("config.example.yaml")
     assert cfg.classifier.claude_api_key == "ck" and cfg.classifier.api_key is None
     assert [m for m, _, _ in cfg.classifier.chain()] == ["claude-haiku-5-5"]
 
@@ -143,5 +143,5 @@ def test_separate_topics_for_resumes_and_low_priority(clean_env):
     clean_env.setenv("NTFY_TOPIC", "t")
     clean_env.setenv("NTFY_TOPIC_RESUMES", "cvs")
     clean_env.setenv("NTFY_TOPIC_LOW", "low")
-    cfg = load_config("config.yaml")
+    cfg = load_config("config.example.yaml")
     assert (cfg.ntfy.topic, cfg.ntfy.resume_topic, cfg.ntfy.low_topic) == ("t", "cvs", "low")
